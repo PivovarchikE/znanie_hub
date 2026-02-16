@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+{% load static %}
+
+{% block title %}Регистрация: {{ role.name }}{% endblock %}
+
+{% block main_container %}
+<div class="container-fluid p-0">
+    <div class="row g-0 min-vh-100">
+
+        <div class="col-lg-4 d-none d-lg-block shadow-lg">
+            <div style="background-image: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)),
+                        url('{% if role.slug == 'student' %}{% static 'images/reg_student_bg.jpg' %}{% else %}{% static 'images/reg_teacher_bg.jpg' %}{% endif %}');
+                        background-size: cover;
+                        background-position: center;
+                        height: 100%;
+                        position: sticky;
+                        top: 0;">
+
+                <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white p-5 text-center">
+                    <h1 class="display-4 fw-bold">Znanie HUB</h1>
+                    <p class="lead">Регистрация в роли: <strong>{{ role.name }}</strong></p>
+                    <div class="mt-5 pt-5">
+                        <small class="opacity-50">
+                            Photo by <a
+                                href="https://unsplash.com/@omarvellous14?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Omar
+                            Ramadan</a>
+                            on <a
+                                href="https://unsplash.com/photos/a-white-kitten-sitting-on-top-of-a-white-carpet-L5gVodQ3xTU?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+
+                        </small>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8 bg-white">
+            <div class="py-5 px-4 px-md-4 mx-auto" style="max-width: 900px;">
+
+                <div class="mb-5">
+                    <h2 class="fw-bold">Создание аккаунта</h2>
+                    <p class="text-muted">Пожалуйста, заполните все необходимые поля для завершения регистрации.</p>
+                </div>
+
+                <form method="post" id="registration-form">
+                    {% csrf_token %}
+
+                    <h5 class="border-bottom pb-2 mb-3 text-primary">Основная информация</h5>
+                    <div class="row">
+                        <div class="col-12">
+                            {% bootstrap_form u_form %}
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3 mt-4 text-primary">Профиль {{ role.name }}</h5>
+                    {% bootstrap_form p_form %}
+
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 mt-4">
+                        <h5 class="m-0 text-primary">Контактные телефоны</h5>
+                        <button type="button" class="btn btn-sm btn-success" id="add-phone-btn">
+                            + Добавить номер
+                        </button>
+                    </div>
+
+                    {{ phone_formset.management_form }}
+
+                    <div id="phone-formset-container">
+                        {% for form in phone_formset %}
+                        <div class="phone-form-row card mb-3 bg-light border-0 shadow-sm">
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-bold small mb-1">{{ form.number.label }}</label>
+                                        {{ form.number }}
+                                        {% if form.number.errors %}
+                                        <div class="text-danger small mt-1">{{ form.number.errors|striptags }}</div>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if role.slug == 'student' %}
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-bold small mb-1">{{ form.relationship.label
+                                            }}</label>
+                                        {{ form.relationship }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-bold small mb-1">{{ form.owner_name.label }}</label>
+                                        {{ form.owner_name }}
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="col-md-3 d-flex align-self-end pb-2">
+                                        <div class="form-check me-3 mb-0" style="min-width: 100px;"> {{ form.is_primary
+                                            }}
+                                            <label class="form-check-label small"
+                                                   for="{{ form.is_primary.id_for_label }}">
+                                                Основной
+                                            </label>
+                                        </div>
+
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm remove-phone-btn border-1 px-2 py-1 ms-auto">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-5">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 shadow">Зарегистрироваться</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/inputmask@5.0.8/dist/inputmask.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("JS инициализирован");
+
+        const container = document.getElementById('phone-formset-container');
+        const addButton = document.getElementById('add-phone-btn');
+        const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
+        const MAX_FORMS = 5; // Устанавливаем лимит
+
+        if (!container || !addButton || !totalForms) {
+            console.error("Не найдены элементы формы!", {container, addButton, totalForms});
+            return;
+        }
+
+        // Функция для управления видимостью кнопки добавления
+        function toggleAddButton() {
+            const currentRows = container.querySelectorAll('.phone-form-row').length;
+            if (currentRows >= MAX_FORMS) {
+                addButton.style.display = 'none';
+            } else {
+                addButton.style.display = 'inline-block';
+            }
+        }
+
+        // Функция для маски
+        function applyMask(row) {
+            const input = row.querySelector('input[name$="-number"]');
+            if (input) {
+                Inputmask("+375-99-999-99-99").mask(input);
+            }
+        }
+
+        // Применяем маску к существующим строкам и проверяем кнопку при загрузке
+        document.querySelectorAll('.phone-form-row').forEach(applyMask);
+        toggleAddButton();
+
+        // Добавление новой формы
+        addButton.addEventListener('click', function() {
+            const rows = container.querySelectorAll('.phone-form-row');
+            const currentIndex = rows.length;
+
+            // Проверка лимита перед добавлением
+            if (currentIndex >= MAX_FORMS) {
+                alert("Максимальное количество номеров: " + MAX_FORMS);
+                return;
+            }
+
+            const newRow = rows[0].cloneNode(true);
+            const idRegex = new RegExp(`-${0}-`, 'g');
+
+            newRow.querySelectorAll('input, select, label').forEach(el => {
+                ['name', 'id', 'for'].forEach(attr => {
+                    if (el.hasAttribute(attr)) {
+                        el.setAttribute(attr, el.getAttribute(attr).replace(idRegex, `-${currentIndex}-`));
+                    }
+                });
+                if (el.tagName === 'INPUT') {
+                    el.value = '';
+                    el.checked = false;
+                }
+            });
+
+            container.appendChild(newRow);
+            totalForms.value = currentIndex + 1;
+            applyMask(newRow);
+            toggleAddButton(); // Проверяем, не пора ли скрыть кнопку
+            console.log("Добавлена форма №" + currentIndex);
+        });
+
+        // Удаление формы
+        container.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-phone-btn') || e.target.closest('.remove-phone-btn')) {
+                const rows = container.querySelectorAll('.phone-form-row');
+                if (rows.length > 1) {
+                    e.target.closest('.phone-form-row').remove();
+                    totalForms.value = container.querySelectorAll('.phone-form-row').length;
+                    toggleAddButton(); // Показываем кнопку снова, если удалили лишнее
+                } else {
+                    alert("Минимум один номер телефона обязателен");
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock main_container %}
+
+

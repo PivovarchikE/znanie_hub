@@ -1,0 +1,86 @@
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %}</title>
+
+</head>
+<body>
+<header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 border-bottom">
+    <div class="container-fluid px-4 d-flex flex-wrap align-items-center justify-content-center justify-content-md-between">
+        <div class="col-md-3 mb-2 mb-md-0">
+            <a href="/" class="navbar-brand">
+                <img src="{% static 'images/logo.png' %}" alt="Znanie HUB" height="100">
+            </a>
+        </div>
+        <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0">
+            <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
+                <img src="{% static 'images/header_home.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                Главная
+            </a>
+            </li>
+            <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
+                <img src="{% static 'images/header_math.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                Математика</a></li>
+            <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
+                <img src="{% static 'images/header_physics.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                Физика</a></li>
+            <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
+                <img src="{% static 'images/header_chemistry.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                Химия</a></li>
+        </ul>
+        <div class="col-md-3 d-flex align-items-center justify-content-end">
+            <form class="w-100 me-3 mb-0 d-flex align-items-center" role="search">
+                    <input type="search" class="form-control" placeholder="Поиск..." aria-label="Search">
+            </form>
+            {% if not user.is_authenticated %}
+            <a href="{% url 'login' %} " button type="button" class="btn btn-outline-primary me-2">Вход</a>
+            <a href="{% url 'select_role' %}" button type="button" class="btn btn-primary">Регистрация</a>
+            {% else %}
+            <a href="{% url 'index' %}" class="nav-link px-2 link-secondary">Привет, {{user.username}}</a>
+            <a href="{% url 'logout' %}" button type="button" class="btn btn-warning">Выход</a>
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+
+    {% if messages %}
+        <div class="alert alert-success" role="alert">
+            <ul class="messages">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+{% block hero %}
+    {# Блок для вставки баннеров #}
+{% endblock hero %}
+
+{% block main_container %}
+<main class="container mt-4">
+    {% block content %}{% endblock %}
+</main>
+{% endblock main_container %}
+
+<footer class="py-3 my-4">
+    <ul class="nav justify-content-center border-bottom pb-3 mb-3">
+        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Home</a></li>
+        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Features</a></li>
+        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Pricing</a></li>
+        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">FAQs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">About</a></li>
+    </ul>
+    <p class="text-center text-body-secondary">© 2026 Znanie HUB</p></footer>
+</body>
+</html>
