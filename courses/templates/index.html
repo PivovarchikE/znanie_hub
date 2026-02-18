@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block hero %}
+<section class="main-banner d-flex align-items-center justify-content-center text-center text-white"
+         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_main.jpg' %}');">
+
+    <div class="container py-5">
+        <h1 class="display-3 fw-bold mt-5">Знание HUB</h1>
+        <p class="lead mb-4">Твое пространство для учебы и развития</p>
+        <div class="mb-5">
+            <a href="{% url 'select_role' %}" class="btn btn-primary btn-lg px-4 me-sm-3">Начать обучение</a>
+            <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
+        </div>
+
+        <div class="mt-5 pt-5">
+            <small class="opacity-50">
+                Photo by <a href="https://unsplash.com/@baim" class="text-white text-decoration-none">Baim Hanif</a>
+                on <a href="https://unsplash.com/" class="text-white text-decoration-none">Unsplash</a>
+            </small>
+        </div>
+    </div>
+</section>
+{% endblock hero %}
+
+
+{% block content %}
+
+<div class="container my-5" id="about"> <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h2 class="text-center mb-4 fw-bold">О проекте</h2>
+            <div class="card border-0 shadow-sm p-4 bg-light">
+                <p class="lead text-muted mb-4">
+                    Добро пожаловать на нашу образовательную платформу — пространство, где ученики 5–11 классов могут изучать физику, химию и математику в удобном и понятном формате.
+                </p>
+                <p class="lead text-muted mb-4">
+                    Здесь вас ждут краткие теоретические объяснения, интерактивные тренажёры, практические задания, домашние работы и проверочные тесты по каждой теме. Платформа помогает не только освоить материал, но и уверенно применять знания на практике.
+                </p>
+                <p class="lead text-muted mb-4">
+                    Рады видеть вас и готовы сопровождать на пути к новым открытиям и отличным результатам.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

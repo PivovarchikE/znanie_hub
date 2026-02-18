@@ -1,0 +1,81 @@
+.main-banner {
+    /* Высота баннера: 60% от высоты экрана. Можно поставить 400px или 500px */
+    min-height: 60vh;
+
+    /* Важнейшие настройки фона */
+    background-size: cover;       /* Картинка заполнит весь блок без искажений */
+    background-position: center;   /* Центрируем картинку */
+    background-repeat: no-repeat;
+
+    /* Дополнительно: центрируем текст внутри баннера */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;    /* Текст ссылки будет внизу */
+    padding: 20px;
+}
+
+/* Ссылка автора на фоне картинки */
+.main-banner a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 0.8rem;
+}
+
+/* Плавная прокрутка для всей страницы */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Настройки баннера (если еще не добавил) */
+.main-banner {
+    min-height: 60vh;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Стиль для блока "О проекте" */
+.about-section {
+    padding: 80px 0;
+    background-color: #f8f9fa; /* Светло-серый фон для контраста */
+}
+
+
+/* Гарантируем, что поля ввода видны и занимают место */
+.phone-form-row input[type="text"],
+.phone-form-row input[type="tel"],
+.phone-form-row select {
+    display: block !important;
+    width: 100% !important;
+    height: 38px !important; /* Высота как у кнопок Bootstrap */
+    visibility: visible !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* Выравниваем чекбокс и его текст в одну линию */
+.phone-form-row .form-check {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Отступ между квадратиком и словом "Основной" */
+}
+
+.phone-form-row .form-check-input {
+    margin-top: 0; /* Убираем смещение вниз */
+    flex-shrink: 0; /* Чтобы чекбокс не сжимался */
+}
+
+.phone-form-row .form-check-label {
+    white-space: nowrap; /* Запрещаем перенос текста "Основной" */
+}
+
+/* Кнопка удаления в рамке */
+.remove-phone-btn {
+    border-radius: 4px;
+    line-height: 1;
+    font-weight: bold;
+    min-width: 32px;
+}
