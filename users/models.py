@@ -144,6 +144,15 @@ class StudentProfile(BaseModel):
         blank=False
     )
 
+    teacher = models.ForeignKey(
+        'TeacherProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='my_students',
+        verbose_name="Закрепленный учитель"
+    )
+
     def __str__(self):
         return f"Профиль ученика: {self.user.username}"
 

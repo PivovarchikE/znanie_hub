@@ -8,7 +8,14 @@
 <html lang="en">
 <head>
     {% load static %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <link rel="icon" href="{% static 'images/apple-touch-icon.png' %}" sizes="any">
+    <link rel="icon" href="{% static 'images/icon.svg' %}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'site.webmanifest' %}">
+
     <meta charset="UTF-8">
     <title>{% block title %}{% endblock %}</title>
 
@@ -21,20 +28,20 @@
                 <img src="{% static 'images/logo.png' %}" alt="Znanie HUB" height="100">
             </a>
         </div>
-        <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0">
+        <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0 gap-5">
             <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
-                <img src="{% static 'images/header_home.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                <img src="{% static 'images/header_home.png' %}" alt="Главная" width="40" height="40" class="d-block mx-auto mb-1">
                 Главная
             </a>
             </li>
-            <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
-                <img src="{% static 'images/header_math.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+            <li><a href="{% url 'math_index' %}" class="nav-link px-2 link-secondary">
+                <img src="{% static 'images/header_math.png' %}" alt="Математика" width="40" height="40" class="d-block mx-auto mb-1">
                 Математика</a></li>
             <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
-                <img src="{% static 'images/header_physics.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                <img src="{% static 'images/header_physics.png' %}" alt="Физика" width="40" height="40" class="d-block mx-auto mb-1">
                 Физика</a></li>
             <li><a href="{% url 'index' %}" class="nav-link px-2 link-secondary">
-                <img src="{% static 'images/header_chemistry.png' %}" alt="Математика" width="24" height="24" class="d-block mx-auto mb-1">
+                <img src="{% static 'images/header_chemistry.png' %}" alt="Химия" width="40" height="40" class="d-block mx-auto mb-1">
                 Химия</a></li>
         </ul>
         <div class="col-md-3 d-flex align-items-center justify-content-end">
@@ -45,8 +52,24 @@
             <a href="{% url 'login' %} " button type="button" class="btn btn-outline-primary me-2">Вход</a>
             <a href="{% url 'select_role' %}" button type="button" class="btn btn-primary">Регистрация</a>
             {% else %}
-            <a href="{% url 'index' %}" class="nav-link px-2 link-secondary">Привет, {{user.username}}</a>
-            <a href="{% url 'logout' %}" button type="button" class="btn btn-warning">Выход</a>
+
+
+
+
+
+            <div class="d-flex justify-content-center align-items-center gap-2">
+                <a href="{% url 'profile_edit' %}" class="d-block link-body-emphasis text-decoration-none" aria-expanded="false"> <img
+                    src="{% static 'images/profile.png' %}" alt="Фото профиля" width="32" height="32" class="rounded-circle"> </a>
+                <span class="nav-link px-2 text-secondary" style="white-space: nowrap;">
+                    {{ user.first_name }} {{ user.last_name }}
+                </span>
+                {% if request.user.is_authenticated and request.user.role and request.user.role.slug == 'teacher' %}
+                <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-success text-nowrap">Личный кабинет</a>
+                {% else %}
+                <a href="{% url 'index' %}" class="btn btn-outline-success text-nowrap">Личный кабинет</a>
+                {% endif %}
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger">Выход</a>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -79,7 +102,7 @@
         <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Features</a></li>
         <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Pricing</a></li>
         <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">FAQs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">About</a></li>
+        <li class="nav-item"><a href="{% url 'thanks' %}" class="nav-link px-2 text-body-secondary">Благодарности</a></li>
     </ul>
     <p class="text-center text-body-secondary">© 2026 Znanie HUB</p></footer>
 </body>

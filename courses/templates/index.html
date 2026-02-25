@@ -10,8 +10,12 @@
         <h1 class="display-3 fw-bold mt-5">Знание HUB</h1>
         <p class="lead mb-4">Твое пространство для учебы и развития</p>
         <div class="mb-5">
-            <a href="{% url 'select_role' %}" class="btn btn-primary btn-lg px-4 me-sm-3">Начать обучение</a>
-            <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
+            {% if not user.is_authenticated %}
+                <a href="{% url 'select_role' %}" class="btn btn-primary btn-lg px-4 me-sm-3">Начать обучение</a>
+                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
+            {% else %}
+                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
+            {% endif %}
         </div>
 
         <div class="mt-5 pt-5">

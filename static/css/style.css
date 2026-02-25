@@ -79,3 +79,73 @@ html {
     font-weight: bold;
     min-width: 32px;
 }
+
+
+/* 1. Стили для ВСЕХ табов (и неактивных, и тех, что стали неактивными) */
+.nav-tabs .nav-link {
+    color: #7b68ee !important;       /* Фиолетовый по умолчанию */
+    font-weight: normal !important;   /* Обычный шрифт по умолчанию */
+    background-color: transparent !important;
+    border: 1px solid transparent !important;
+    transition: all 0.3s ease;
+}
+
+/* 2. Стили строго для АКТИВНОГО таба */
+.nav-tabs .nav-link.active {
+    color: #6c757d !important;        /* Серый только когда активен */
+    font-weight: bold !important;     /* Жирный только когда активен */
+    background-color: #fff !important;
+    border-color: #dee2e6 #dee2e6 #fff !important;
+    border-radius: 5px 5px 0 0;
+}
+
+/* 3. Ховер только для неактивных */
+.nav-tabs .nav-link:hover:not(.active) {
+    color: #5a4dbb !important;
+    border-color: #eee #eee transparent !important;
+}
+
+/* Контейнер списка тем */
+.custom-list {
+    list-style: none; /* Убираем стандартные маркеры */
+    padding-left: 0;  /* Сбрасываем внутренний отступ контейнера */
+    margin-top: 20px;
+}
+
+/* Элемент списка (тема) */
+.custom-list li {
+    position: relative;
+    padding-left: 30px;      /* Отступ текста от левого края (где будет точка) */
+    margin-bottom: 20px;     /* Тот самый отступ МЕЖДУ темами */
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #6c757d;          /* Серый цвет текста */
+}
+
+/* Кастомный буллит (точка) */
+.custom-list li::before {
+    content: "•";            /* Символ точки */
+    color: #adb5bd;          /* Светло-серый цвет точки */
+    position: absolute;
+    left: 5px;               /* Положение точки относительно края */
+    top: -2px;               /* Небольшая корректировка по вертикали */
+    font-size: 1.5rem;       /* Размер самой точки */
+    line-height: 1;
+}
+
+/* Опционально: убираем отступ у последнего элемента */
+.custom-list li:last-child {
+    margin-bottom: 0;
+}
+
+/* Подсветка названия темы при наведении */
+.topic-title:hover {
+    color: #7b68ee;
+    transition: color 0.2s ease;
+}
+
+/* Чтобы описание не наезжало на точку-буллит */
+.custom-list li div.small {
+    margin-top: 4px;
+    line-height: 1.2;
+}

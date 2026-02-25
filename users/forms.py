@@ -7,6 +7,7 @@ from django.forms.models import BaseInlineFormSet
 from courses.models import Subject
 from users.models import TeacherProfile, UserPhoneNumber, StudentProfile, SchoolClass
 
+
 User = get_user_model()
 
 
@@ -48,6 +49,8 @@ class UserRegistrationForm(forms.ModelForm):
         help_text="Мы отправим подтверждение на этот адрес."
     )
 
+    # проверить на наличие password field, наследование от create form?
+
     password = forms.CharField(
         label="Пароль",
         widget=forms.PasswordInput(attrs={'class': 'form-control',
@@ -69,13 +72,6 @@ class UserRegistrationForm(forms.ModelForm):
             'placeholder': ''
         })
     )
-
-    subjects = forms.ModelMultipleChoiceField(
-        label='Выберите предметы',
-        queryset=Subject.objects.all(),
-        widget=forms.CheckboxSelectMultiple()
-    )
-
 
     def clean(self):
         cleaned_data = super().clean()
@@ -101,7 +97,6 @@ class UserRegistrationForm(forms.ModelForm):
             'email',
             'password',
             'password_confirm',
-            'subjects'
         ]
 
 
@@ -112,10 +107,15 @@ class TeacherProfileForm(forms.ModelForm):
         queryset=SchoolClass.objects.all(),
         widget=forms.CheckboxSelectMultiple()
     )
+    subjects = forms.ModelMultipleChoiceField(
+        label='Изучаемые предметы',
+        queryset=Subject.objects.all(),
+        widget=forms.CheckboxSelectMultiple()
+    )
 
     class Meta:
         model = TeacherProfile
-        fields = ['school_classes']
+        fields = ['school_classes', 'subjects']
 
 class StudentProfileForm(forms.ModelForm):
     # Ученик: много предметов, но только ОДИН класс
@@ -126,9 +126,15 @@ class StudentProfileForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
+    subjects = forms.ModelMultipleChoiceField(
+        label='Изучаемые предметы',
+        queryset=Subject.objects.all(),
+        widget=forms.CheckboxSelectMultiple()
+    )
+
     class Meta:
         model = StudentProfile
-        fields = ['school_class']
+        fields = ['school_class', 'subjects']
 
 
 class UserPhoneNumberForm(forms.ModelForm):
@@ -179,16 +185,13 @@ class BasePhoneFormSet(BaseInlineFormSet):
         super().clean()
 
         role_slug = getattr(self, 'role_slug', None)
-        has_primary = False
+        primary_count = 0
         filled_forms_count = 0
 
         for form in self.forms:
-            # Пропускаем формы, помеченные на удаление
             if form.cleaned_data.get('DELETE'):
                 continue
 
-            # Проверяем, ввел ли пользователь хоть что-то в номер
-            # Используем .get(), так как при ошибках валидации поля 'number' может не быть в cleaned_data
             number = form.cleaned_data.get('number')
 
             if number:
@@ -197,22 +200,20 @@ class BasePhoneFormSet(BaseInlineFormSet):
                 primary = form.cleaned_data.get('is_primary')
 
                 if primary:
-                    has_primary = True
+                    primary_count += 1
 
-                # Проверка роли
                 if role_slug == 'teacher' and rel != UserPhoneNumber.RelationshipType.OWN:
                     form.add_error('relationship', "Учитель может добавлять только личные номера.")
 
-        # Если вообще нет заполненных номеров
         if filled_forms_count == 0:
             raise forms.ValidationError("Добавьте хотя бы один контактный номер телефона.")
 
-        # Если номера есть, но никто не "основной"
-        if filled_forms_count > 0 and not has_primary:
-            # кидаем ошибку в ПЕРВУЮ форму, чтобы подсветить её
+        if filled_forms_count > 0 and primary_count == 0:
             self.forms[0].add_error('is_primary', "Выберите основной номер")
-            # И дублируем общим текстом сверху
             raise forms.ValidationError("Один из номеров должен быть отмечен как основной.")
+
+        if primary_count > 1:
+            raise forms.ValidationError("Только один номер может быть основным. Пожалуйста, снимите лишние галочки.")
 
 
 # # Создаем Formset: привязываем номера к пользователю
@@ -228,3 +229,18 @@ PhoneFormSet = inlineformset_factory(
     can_delete=True,
 )
 
+
+# здесь не учтена смена пароля
+class UserProfileEditForm(forms.ModelForm):
+    username = forms.CharField(label='Имя пользователя', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    last_name = forms.CharField(label='Фамилия', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    first_name = forms.CharField(label='Имя', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    middle_name = forms.CharField(label='Отчество', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    date_of_birth = forms.DateField(
+        label='Дата рождения',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'last_name', 'first_name', 'middle_name', 'date_of_birth']
