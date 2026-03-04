@@ -129,7 +129,10 @@ class StudentProfileForm(forms.ModelForm):
     subjects = forms.ModelMultipleChoiceField(
         label='Изучаемые предметы',
         queryset=Subject.objects.all(),
-        widget=forms.CheckboxSelectMultiple()
+        widget=forms.CheckboxSelectMultiple(),
+        error_messages = {
+        'required': 'Пожалуйста, выберите хотя бы один предмет.'
+    }
     )
 
     class Meta:
@@ -244,3 +247,14 @@ class UserProfileEditForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['username', 'last_name', 'first_name', 'middle_name', 'date_of_birth']
+
+
+class StudentEditForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email'] # Поля, которые можно менять
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+        }

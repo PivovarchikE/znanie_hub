@@ -1,3 +1,5 @@
+import os
+
 from django.db import models
 from users.models import User, BaseModel, SchoolClass, StudentProfile, TeacherProfile
 
@@ -79,9 +81,44 @@ class Homework(BaseModel):
     ]
     student = models.ForeignKey('users.StudentProfile', on_delete=models.CASCADE, related_name='homeworks')
     teacher = models.ForeignKey('users.TeacherProfile', on_delete=models.CASCADE)
+    subject = models.ForeignKey('courses.Subject', on_delete=models.CASCADE, null=True, verbose_name="Предмет")
+    section = models.ForeignKey('courses.Section', on_delete=models.CASCADE, verbose_name="Раздел", null=True,
+                                blank=True)
+    topic = models.ForeignKey('courses.Topic', on_delete=models.CASCADE, null=True, verbose_name="Тема")
     hw_type = models.CharField("Тип задания", max_length=20, choices=TYPE_CHOICES)
     title = models.CharField("Название", max_length=255)
     content = models.TextField("Содержание (текст)", blank=True, null=True)
     simulator_config = models.ForeignKey('courses.SimulatorConfig', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Конфигурация тренажера")
+    score = models.PositiveIntegerField(default=0)
     deadline = models.DateTimeField("Срок сдачи", null=True, blank=True)
-    is_active = models.BooleanField(default=True) # Для Soft Delete
+    is_completed = models.BooleanField(default=False)
+
+    def get_status_for_student(self, student_user):
+        if self.hw_type == 'simulator':
+            # Проверяем, есть ли завершенные сессии по этой конфигурации
+            return TrainingSession.objects.filter(
+                student=student_user,
+                config=self.simulator_config,
+                end_time__isnull=False
+            ).exists()
+        # Для текстовых заданий тут будет логика проверки загруженных ответов (Solution)
+        return False
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class HomeworkFile(BaseModel):
+    homework = models.ForeignKey(
+        'Homework',
+        on_delete=models.CASCADE,
+        related_name='files'
+    )
+    file = models.FileField("Файл", upload_to='homeworks/%Y/%m/%d/')
+    original_name = models.CharField(max_length=255, blank=True) # Чтобы хранить красивое имя файла
+
+    def filename(self):
+        return os.path.basename(self.file.name)
+
+    def __str__(self):
+        return self.original_name or self.file.name

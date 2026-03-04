@@ -66,7 +66,7 @@
                 {% if request.user.is_authenticated and request.user.role and request.user.role.slug == 'teacher' %}
                 <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-success text-nowrap">Личный кабинет</a>
                 {% else %}
-                <a href="{% url 'index' %}" class="btn btn-outline-success text-nowrap">Личный кабинет</a>
+                <a href="{% url 'student_dashboard' %}" class="btn btn-outline-success text-nowrap">Личный кабинет</a>
                 {% endif %}
                 <a href="{% url 'logout' %}" class="btn btn-outline-danger">Выход</a>
             </div>

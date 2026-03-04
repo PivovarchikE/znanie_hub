@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dataElement = document.getElementById('all-configs-data');
     if (!dataElement) return;
 
-    // Теперь здесь будет чистый объект, а не строка
     const allConfigs = JSON.parse(dataElement.textContent);
 
     let activeProblems = [];
@@ -12,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let startTime;
     let timerInterval;
 
-    // Создаем объект elements, чтобы не было ошибки "not defined"
     const elements = {
         setupScreen: document.getElementById('setupScreen'),
         workoutScreen: document.getElementById('workoutScreen'),
@@ -24,36 +22,89 @@ document.addEventListener('DOMContentLoaded', () => {
         progressBar: document.getElementById('progressBar'),
         currentStep: document.getElementById('currentStep'),
         nextBtn: document.getElementById('nextBtn'),
-        finishBtn: document.getElementById('finishEarlyBtn')
+        finishBtn: document.getElementById('finishEarlyBtn'),
+        startBtn: document.getElementById('startWorkoutBtn')
     };
 
-    // ВЫБОР СЛОЖНОСТИ
+    // --- ГЛАВНАЯ ПРОВЕРКА ПРИ ЗАГРУЗКЕ ---
+    if (CONFIG_DATA.isAlreadyCompleted) {
+        // Сразу прячем всё лишнее
+        if (elements.setupScreen) elements.setupScreen.classList.add('d-none');
+        if (elements.workoutScreen) elements.workoutScreen.classList.add('d-none');
+
+        alert("Вы уже выполнили это задание.");
+
+
+        return; // ПРЕКРАЩАЕМ выполнение скрипта
+    }
+
+    // Если не пройдено — продолжаем обычную работу
+    if (CONFIG_DATA.presetConfigId) {
+        initWorkout(CONFIG_DATA.presetConfigId);
+    }
+
+    // --- ФУНКЦИИ ЛОГИКИ ---
+
+    function initWorkout(configId) {
+        const configData = allConfigs[String(configId)];
+        if (!configData) return;
+
+        activeProblems = configData.problems;
+        currentConfigId = configId;
+
+        // Если зашли из ДЗ (есть presetConfigId), сразу скрываем настройки и стартуем
+        if (CONFIG_DATA.presetConfigId) {
+            startWorkout();
+        } else {
+            // Иначе просто показываем инфо о выбранном режиме на экране настроек
+            elements.modeLabel.innerText = configData.label;
+            elements.modeInfo.classList.remove('d-none');
+        }
+    }
+
+    function startWorkout() {
+        if (CONFIG_DATA.isAlreadyCompleted) {
+            alert("Вы уже выполнили это задание.");
+            window.location.href = "/dashboard/"; // Перенаправляем
+            return;
+        }
+
+        if (activeProblems.length === 0) return;
+
+        elements.setupScreen.classList.add('d-none');
+        elements.workoutScreen.classList.remove('d-none');
+
+        currentIdx = 0;
+        results = [];
+        startTime = new Date();
+
+        startTimer();
+        loadQuestion();
+    }
+
+    // --- ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ---
+
+    // Проверяем, пришел ли ученик из ДЗ
+    if (CONFIG_DATA.presetConfigId) {
+        console.log("Автозапуск для конфига:", CONFIG_DATA.presetConfigId);
+        initWorkout(CONFIG_DATA.presetConfigId);
+    }
+
+    // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+    // Кнопки выбора сложности (ручной выбор)
     document.querySelectorAll('.config-select-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.config-select-btn').forEach(b => b.classList.replace('btn-primary', 'btn-outline-primary'));
+            document.querySelectorAll('.config-select-btn').forEach(b =>
+                b.classList.replace('btn-primary', 'btn-outline-primary'));
             this.classList.replace('btn-outline-primary', 'btn-primary');
 
-            const configId = String(this.dataset.id);
-            const configData = allConfigs[configId];
-
-            if (configData) {
-                activeProblems = configData.problems;
-                currentConfigId = configId;
-                elements.modeLabel.innerText = configData.label;
-                elements.modeInfo.classList.remove('d-none');
-            }
+            initWorkout(this.dataset.id);
         });
     });
 
-    // СТАРТ
-    document.getElementById('startWorkoutBtn').addEventListener('click', () => {
-        if (activeProblems.length === 0) return;
-        elements.setupScreen.classList.add('d-none');
-        elements.workoutScreen.classList.remove('d-none');
-        startTime = new Date();
-        startTimer();
-        loadQuestion();
-    });
+    // Кнопка "Начать" на экране настроек
+    elements.startBtn.addEventListener('click', startWorkout);
 
     function loadQuestion() {
         if (currentIdx >= activeProblems.length) {
@@ -65,22 +116,29 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.input.value = '';
         elements.input.focus();
         elements.currentStep.innerText = currentIdx + 1;
-        elements.progressBar.style.width = `${(currentIdx / activeProblems.length) * 100}%`;
+
+        // Обновление прогресс-бара
+        const progress = (currentIdx / activeProblems.length) * 100;
+        elements.progressBar.style.width = `${progress}%`;
     }
 
     function handleNext() {
-        if (!elements.input.value) return;
+        const val = elements.input.value.trim();
+        if (!val) return;
+
         results.push({
             q: activeProblems[currentIdx].question,
-            user_a: elements.input.value,
+            user_a: val,
             correct_a: activeProblems[currentIdx].answer,
-            is_correct: elements.input.value === activeProblems[currentIdx].answer
+            is_correct: val === String(activeProblems[currentIdx].answer)
         });
+
         currentIdx++;
         loadQuestion();
     }
 
     function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             let diff = Math.floor((new Date() - startTime) / 1000);
             let m = Math.floor(diff / 60).toString().padStart(2, '0');
@@ -89,76 +147,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    // Слушатели событий
     elements.nextBtn.addEventListener('click', handleNext);
     elements.input.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleNext(); });
-    elements.finishBtn.addEventListener('click', () => finishTraining());
+    elements.finishBtn.addEventListener('click', () => {
+        if(confirm("Завершить тренировку досрочно?")) finishTraining();
+    });
 
     async function finishTraining() {
         clearInterval(timerInterval);
 
-        // 1. Объявляем переменные ОДИН раз в начале функции
         const total = results.length;
         const correctCount = results.filter(r => r.is_correct).length;
-        const timeStr = document.getElementById('timer').innerText;
+        const timeStr = elements.timer.innerText;
         const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
-        // 2. Обновляем модалку (теперь используем наши переменные)
+        // Обновление модалки
         document.getElementById('resSolved').innerText = total;
         document.getElementById('resCorrectCount').innerText = correctCount;
         document.getElementById('resCorrectPercent').innerText = percent + '%';
         document.getElementById('resTime').innerText = timeStr;
 
-        // Показываем модалку
         const modal = new bootstrap.Modal(document.getElementById('resultModal'));
         modal.show();
 
-
-        document.getElementById('showDetailsBtn').addEventListener('click', function() {
-        const tableBody = document.getElementById('detailsTableBody');
-        tableBody.innerHTML = ''; // Очищаем старые данные
-
-        results.forEach(res => {
-            const row = `
-                <tr>
-                    <td>${res.q}</td>
-                    <td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">${res.user_a}</td>
-                    <td><span class="badge bg-secondary">${res.correct_a}</span></td>
-                    <td>${res.is_correct ? '✅' : '❌'}</td>
-                </tr>
-            `;
-            tableBody.insertAdjacentHTML('beforeend', row);
-        });
-
-        document.getElementById('detailedResults').classList.remove('d-none');
-        this.classList.add('d-none'); // Прячем саму кнопку "Подробнее"
-    });
-
-        // 2. А сохраняем ТОЛЬКО если пользователь залогинен
-    if (CONFIG_DATA.isAuthenticated) {
-        try {
-            const response = await fetch('/save_training_result/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': CONFIG_DATA.csrfToken
-                },
-                body: JSON.stringify({
-                    config_id: currentConfigId,
-                    total: total,
-                    correct: correctCount,
-                    details: results
-                })
-            });
-
-            if (!response.ok) throw new Error("Ошибка сервера");
-            console.log("Результат сохранен в профиль.");
-        } catch (error) {
-            console.error("Ошибка сохранения:", error);
-            alert("Не удалось сохранить результат в ваш профиль.");
+        // Обработка кнопки "Подробнее" в модалке
+        const detailsBtn = document.getElementById('showDetailsBtn');
+        if (detailsBtn) {
+            detailsBtn.classList.remove('d-none');
+            detailsBtn.onclick = function() {
+                const tableBody = document.getElementById('detailsTableBody');
+                tableBody.innerHTML = results.map(res => `
+                    <tr>
+                        <td>${res.q}</td>
+                        <td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">${res.user_a}</td>
+                        <td><span class="badge bg-secondary">${res.correct_a}</span></td>
+                        <td>${res.is_correct ? '✅' : '❌'}</td>
+                    </tr>
+                `).join('');
+                document.getElementById('detailedResults').classList.remove('d-none');
+                this.classList.add('d-none');
+            };
         }
-        } else {
-            console.log("Режим гостя: результат не будет сохранен в базу.");
+
+        // Сохранение в БД
+        if (CONFIG_DATA.isAuthenticated) {
+            try {
+                const response = await fetch('/save_training_result/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CONFIG_DATA.csrfToken
+                    },
+                    body: JSON.stringify({
+                        config_id: currentConfigId,
+                        homework_id: CONFIG_DATA.assignmentId, // Передаем ID домашки
+                        total: total,
+                        correct: correctCount,
+                        details: results
+                    })
+                });
+                if (!response.ok) throw new Error("Ошибка сервера");
+            } catch (error) {
+                console.error("Ошибка сохранения:", error);
+            }
         }
     }
 });

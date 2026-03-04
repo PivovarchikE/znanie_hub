@@ -14,34 +14,23 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-
+from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.views.generic import TemplateView
 
+from config import settings
 from courses import views as courses_views
 from users import views as users_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('', courses_views.index, name='index'),
-    path('thanks/', courses_views.thanks, name='thanks'),
-
-    # registration
-    path('select-role/', users_views.select_role, name='select_role'),
-    # <slug:role_slug> — это "ловушка", которая поймает любое слово после /register/
-    path('register/<slug:role_slug>/', users_views.dynamic_register_view, name='dynamic_register'),
-    path('login/', users_views.login_view, name='login'),
-    path('logout/', users_views.logout_view, name='logout'),
-    # profile and dashboards
-    path('profile_edit/', users_views.profile_edit_view, name='profile_edit'),
-    path('dashboard/', courses_views.teacher_dashboard_view, name='teacher_dashboard'),
-    path('dashboard/student/<int:student_id>/', courses_views.student_detail_view, name='student_detail'),
-    path('dashboard/student/<int:student_id>/add-homework/', courses_views.add_homework_view, name='add_homework'),
-
-    # math
-    path('math', courses_views.math_index, name='math_index'),
-    # универсальная страница тренажеров и теории
-    path('topic/<int:topic_id>/', courses_views.topic_detail, name='topic_detail'),
-    # сохранение результатов
-    path('save_training_result/', courses_views.save_training_result, name='save_training_result'),
+    path('', TemplateView.as_view(template_name='index.html'), name='index'),
+    path('thanks/', TemplateView.as_view(template_name='thanks.html'), name='thanks'),
+    path('', include('courses.urls')),
+    path('', include('users.urls')),
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

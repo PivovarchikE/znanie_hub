@@ -144,13 +144,11 @@ class StudentProfile(BaseModel):
         blank=False
     )
 
-    teacher = models.ForeignKey(
+    teachers = models.ManyToManyField(
         'TeacherProfile',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
         related_name='my_students',
-        verbose_name="Закрепленный учитель"
+        verbose_name="Учителя",
+        blank=True
     )
 
     def __str__(self):

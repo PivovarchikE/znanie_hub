@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            {% if request.user.role.slug == 'teacher' %}
+                <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Дашборд</a></li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'student_detail' homework.student.id %}">{{ homework.student.user.get_full_name }}</a>
+                </li>
+            {% else %}
+                <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Мои задания</a></li>
+            {% endif %}
+            <li class="breadcrumb-item active">{{ homework.title|truncatechars:20 }}</li>
+        </ol>
+    </nav>
+
+    <div class="card shadow border-0 p-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <div class="text-uppercase text-muted small fw-bold mb-1">
+                    {{ homework.subject.name }} &bull; {{ homework.section.title }}
+                </div>
+                <h2 class="flex-grow-1 fw-bold mb-2">{{ homework.title }}</h2>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge {% if homework.hw_type == 'simulator' %}bg-info text-dark{% else %}bg-primary{% endif %} px-3">
+                        {{ homework.get_hw_type_display }}
+                    </span>
+                    <span class="text-muted small">Тема: <strong>{{ homework.topic.title }}</strong></span>
+                </div>
+            </div>
+                 <div class="d-flex gap-2 flex-shrink-0">
+                    {% if request.user.role.slug == 'teacher' %}
+                        <a href="{% url 'student_detail' homework.student.id %}" class="btn btn-light btn-sm">
+                            <i class="bi bi-arrow-left"></i>← Назад к ученику
+                        </a>
+                        <a href="{% url 'edit_homework' homework.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i> Редактировать
+                        </a>
+                    {% else %}
+                        <a href="{% url 'student_dashboard' %}" class="btn btn-light btn-sm">← К моим заданиям</a>
+                    {% endif %}
+                </div>
+                </div>
+        </div>
+
+        <hr>
+
+        <div class="homework-body">
+            {% if homework.hw_type == 'simulator' %}
+                {% if request.user.role.slug == 'student' %}
+            <div class="col-md-4 text-md-left mt-3 mt-md-0">
+                {# Генерируем ссылку только если есть ID темы #}
+                {% if homework.topic %}
+                    <a href="{% url 'topic_detail' homework.topic.id %}?config={{ homework.simulator_config.id }}&hw={{ homework.id }}"
+                       target="_blank" class="btn btn-info text-white px-4 shadow-sm">
+                        <i class="bi bi-play-circle me-1"></i> Запустить тренажер
+                    </a>
+                {% else %}
+                    <button class="btn btn-secondary disabled">Тренажер недоступен</button>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% else %}
+                <div class="homework-content mb-4">
+                    <h5 class="fw-bold mb-3">Инструкции к выполнению:</h5>
+                    <div class="p-4 bg-white rounded border shadow-sm shadow-sm-hover" style="white-space: pre-line; min-height: 100px;">
+                        {{ homework.content|default:"Инструкции отсутствуют." }}
+                    </div>
+                </div>
+
+                {% if homework.files.all %}
+                    <div class="files-section mt-4">
+                        <h5 class="fw-bold mb-3">Прикрепленные материалы:</h5>
+                        <div class="row g-3">
+                            {% for file_obj in homework.files.all %}
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded d-flex align-items-center bg-white shadow-sm">
+                                        <div class="fs-2 me-3">
+                                            {% if '.pdf' in file_obj.file.name %}📕{% elif '.doc' in file_obj.file.name %}📘{% else %}📄{% endif %}
+                                        </div>
+                                        <div class="overflow-hidden">
+                                            <div class="fw-bold text-truncate">{{ file_obj.original_name|default:file_obj.filename }}</div>
+                                            <small class="text-muted">{{ file_obj.file.size|filesizeformat }}</small>
+                                        </div>
+                                        <a href="{{ file_obj.file.url }}" class="ms-auto btn btn-sm btn-light border" download> Скачать
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
+        </div>
+
+        <div class="mt-5 pt-3 border-top d-flex justify-content-between align-items-center">
+            <div class="text-muted small">
+                <i class="bi bi-person-badge me-1"></i> Для ученика: <strong>{{ homework.student.user.get_full_name }}</strong>
+            </div>
+            {% if homework.deadline %}
+                <div class="alert {% if homework.is_overdue %}alert-danger{% else %}alert-warning{% endif %} py-1 px-3 mb-0 small">
+                    <i class="bi bi-alarm me-1"></i> Срок сдачи: {{ homework.deadline|date:"d.m.Y H:i" }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

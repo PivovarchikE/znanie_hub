@@ -2,32 +2,6 @@
 {% load static %}
 
 
-{% block hero %}
-<section class="main-banner d-flex align-items-center justify-content-center text-center text-white"
-         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_main.jpg' %}');">
-
-    <div class="container py-5">
-        <h1 class="display-3 fw-bold mt-5">Знание HUB</h1>
-        <p class="lead mb-4">Твое пространство для учебы и развития</p>
-        <div class="mb-5">
-            {% if not user.is_authenticated %}
-                <a href="{% url 'select_role' %}" class="btn btn-primary btn-lg px-4 me-sm-3">Начать обучение</a>
-                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
-            {% else %}
-                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
-            {% endif %}
-        </div>
-
-        <div class="mt-5 pt-5">
-            <small class="opacity-50">
-                Photo by <a href="https://unsplash.com/@baim" class="text-white text-decoration-none">Baim Hanif</a>
-                on <a href="https://unsplash.com/" class="text-white text-decoration-none">Unsplash</a>
-            </small>
-        </div>
-    </div>
-</section>
-{% endblock hero %}
-
 
 {% block content %}
 
@@ -47,20 +21,60 @@
                     {{ student.school_class.number }} класс |
                     Предметы: {% for s in student.subjects.all %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
                 </p>
-                <div class="small mt-2">
-                    <strong>Контакты:</strong> {{ student.user.email|default:"Email не указан" }}
-                </div>
             </div>
-            <div>
-                <a href="#" class="btn btn-outline-primary btn-sm">Редактировать</a>
-                <button class="btn btn-outline-danger btn-sm">Удалить</button>
+             <div>
+                <a href="{% url 'edit_student' student.id %}" class="btn btn-outline-primary btn-sm">Редактировать</a>
+
+                <form action="{% url 'delete_student' student.id %}" method="post"
+                      style="display: inline;"
+                      onsubmit="return confirm('Вы уверены, что хотите удалить ученика? Все его данные будут скрыты.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                </form>
             </div>
         </div>
     </div>
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="fw-bold mb-3">Контакты ученика</h5>
 
+        <div class="d-flex align-items-center mb-3">
+            <i class="bi bi-envelope text-primary me-3"></i>
+            <div>
+                <div class="text-muted small">Email</div>
+                <div>{{ student.user.email|default:"Не указан" }}</div>
+            </div>
+        </div>
+
+        <hr class="my-3 opacity-25">
+
+        <div class="text-muted small mb-2">Телефоны</div>
+        {% for phone in student.user.phones.all %}
+            <div class="d-flex align-items-center mb-2">
+                <i class="bi bi-telephone text-success me-3"></i>
+                <div>
+                    <div class="fw-bold">
+                        <a href="tel:{{ phone.number }}" class="text-decoration-none text-dark">
+                            {{ phone.number }}
+                        </a>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.8rem;">
+                        {{ phone.get_relationship_display }}, {{ phone.owner_name }}
+                    </div>
+                </div>
+                <a href="https://wa.me/{{ phone.number|cut:'+'|cut:' '|cut:'-' }}"
+                   target="_blank" class="ms-auto btn btn-sm btn-outline-success border-0">
+                    <i class="bi bi-whatsapp"></i>
+                </a>
+            </div>
+        {% empty %}
+            <p class="text-muted small">Номера телефонов не добавлены</p>
+        {% endfor %}
+    </div>
+</div>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4>Домашние задания</h4>
-        <a href="{% url 'add_homework' student.user.id %}" class="btn btn-primary btn-sm">+ Добавить ДЗ</a>
+        <a href="{% url 'add_homework' student.id %}" class="btn btn-primary btn-sm">+ Добавить ДЗ</a>
     </div>
 
     <div class="card shadow-sm border-0">
@@ -68,6 +82,8 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="bg-light">
                     <tr>
+                        <th>Дата задания</th>
+                        <th>Предмет</th>
                         <th>Тип</th>
                         <th>Задание</th>
                         <th>Срок</th>
@@ -78,6 +94,12 @@
                 <tbody>
                     {% for hw in homeworks %}
                     <tr>
+                        <td>
+                            {{ hw.created_at|date:"d.m.Y H:i"|default:"—" }}
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ hw.subject.name }}</span>
+                        </td>
                         <td>
                             <span class="badge {% if hw.hw_type == 'simulator' %}bg-info{% else %}bg-secondary{% endif %}">
                                 {{ hw.get_hw_type_display }}
@@ -97,12 +119,24 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-                            {% if not hw.is_completed %}
-                                <a href="#" class="btn btn-link p-0 me-2" title="Редактировать">✏️</a>
+                            {% if hw.hw_type == 'simulator' and hw.is_completed %}
+                                <button class="btn btn-link text-info p-0 me-2"
+                                        onclick="showHwDetails('{{ hw.id }}')"
+                                        title="Посмотреть детализацию">
+                                    📊
+                                </button>
                             {% endif %}
-                            <a href="#" class="btn btn-primary btn-sm px-2 py-1" style="border-radius: 4px;">
-                                <i class="bi bi-arrow-right-short text-white fs-5"></i> ⮕
-                            </a>
+                            {% if not hw.is_completed %}
+                                <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 me-2" title="Редактировать">✏️</a>
+                            {% endif %}
+                            <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 me-2" title="Просмотр">👁️</a>
+                            <form action="{% url 'delete_homework' hw.id %}" method="post"
+                                  onsubmit="return confirm('Вы уверены, что хотите удалить это задание?');" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link text-danger p-0 ms-2" title="Удалить">
+                                    <i class="bi bi-trash"></i> 🗑️
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% empty %}
@@ -115,5 +149,85 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="teacherDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold">Результаты: <span id="modalHwTitle" class="text-primary"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Пример</th>
+                                <th>Ответ ученика</th>
+                                <th>Правильный</th>
+                                <th class="text-center">Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacherDetailsBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showHwDetails(hwId) {
+    const body = document.getElementById('teacherDetailsBody');
+    const title = document.getElementById('modalHwTitle');
+
+    // Очистка и лоадер
+    body.innerHTML = '<tr><td colspan="4" class="text-center py-3">Загрузка данных...</td></tr>';
+
+    // Показываем модалку сразу
+    const modal = new bootstrap.Modal(document.getElementById('teacherDetailsModal'));
+    modal.show();
+
+    // Запрос к API (используем ранее созданный URL)
+    fetch(`/api/homework-results/${hwId}/`)
+        .then(response => {
+            if (!response.ok) throw new Error('Данные не найдены');
+            return response.json();
+        })
+        .then(data => {
+            title.innerText = data.title;
+            body.innerHTML = '';
+
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(res => {
+                    const row = `
+                        <tr>
+                            <td class="fw-bold">${res.q}</td>
+                            <td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">
+                                ${res.user_a}
+                            </td>
+                            <td><span class="badge bg-secondary">${res.correct_a}</span></td>
+                            <td class="text-center">${res.is_correct ? '✅' : '❌'}</td>
+                        </tr>
+                    `;
+                    body.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Нет данных о сессии</td></tr>';
+            }
+        })
+            .catch(err => {
+                console.error("Debug info:", err);
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-danger py-4">
+                            <i class="bi bi-exclamation-triangle"></i> Результаты еще не синхронизированы.<br>
+                            <small class="text-muted">Проверьте, завершил ли ученик сессию корректно.</small>
+                        </td>
+                    </tr>`;
+            });
+}
+</script>
 
 {% endblock %}
