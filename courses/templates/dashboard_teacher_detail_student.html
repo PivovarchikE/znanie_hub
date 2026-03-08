@@ -108,14 +108,35 @@
                         <td><strong>{{ hw.title }}</strong></td>
                         <td>{{ hw.deadline|date:"d.m.Y H:i"|default:"—" }}</td>
                         <td>
-                            {% if hw.hw_type == 'simulator' %}
-                                {% if hw.is_completed %}
-                                    <span class="text-success">✅ {{ hw.score }}%</span>
-                                {% else %}
-                                    <span class="text-warning">⏳ Не выполнено</span>
-                                {% endif %}
+                            {% if hw.is_completed %}
+                                {# ЗАВЕРШЕННЫЕ ЗАДАНИЯ #}
+                                <span class="text-success fw-bold">
+                                    <i class="bi bi-check-square-fill"></i>
+                                    {% if hw.hw_type == 'simulator' %}
+                                        {{ hw.score }}%
+                                    {% elif hw.hw_type == 'practice' %}
+                                        {{ hw.actual_score|default:"10" }}/10
+                                    {% else %}
+                                        Изучено
+                                    {% endif %}
+                                </span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                                {# ЗАДАНИЯ В ПРОЦЕССЕ #}
+                                {% if hw.status == 'review' %}
+                                    <span class="badge bg-info text-dark">
+                                        <i class="bi bi-eye-fill"></i> На проверке
+                                    </span>
+                                {% elif hw.status == 'correction' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> На доработке
+                                    </span>
+                                {% else %}
+                                    {# Статус pending или если status еще не заполнен #}
+                                    <span class="text-muted">
+                                        <i class="bi bi-clock-history"></i>
+                                        {% if hw.hw_type == 'simulator' %}Не выполнено{% else %}Не прочитано{% endif %}
+                                    </span>
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td class="text-end">
@@ -123,18 +144,18 @@
                                 <button class="btn btn-link text-info p-0 me-2"
                                         onclick="showHwDetails('{{ hw.id }}')"
                                         title="Посмотреть детализацию">
-                                    📊
+                                    <i class="bi bi-bar-chart-line"></i>
                                 </button>
                             {% endif %}
                             {% if not hw.is_completed %}
-                                <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 me-2" title="Редактировать">✏️</a>
+                                <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 me-2" title="Редактировать"><i class="bi bi-pencil-square"></i>️</a>
                             {% endif %}
-                            <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 me-2" title="Просмотр">👁️</a>
+                            <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 me-2" title="Просмотр"> <i class="bi bi-eye"></i> </a>
                             <form action="{% url 'delete_homework' hw.id %}" method="post"
                                   onsubmit="return confirm('Вы уверены, что хотите удалить это задание?');" style="display:inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-link text-danger p-0 ms-2" title="Удалить">
-                                    <i class="bi bi-trash"></i> 🗑️
+                                    <i class="bi bi-trash"></i>
                                 </button>
                             </form>
                         </td>

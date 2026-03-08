@@ -2,7 +2,7 @@
 name = "znanie_hub"
 version = "0.1.0"
 description = "Platform for study math, physics and chemistry"
-authors = ["Evgeniy Pivovarchi <eugene.pivovarchik@gmail.com>"]
+authors = ["Evgeniy Pivovarchik <eugene.pivovarchik@gmail.com>"]
 readme = "README.md"
 package-mode = false
 
