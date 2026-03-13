@@ -2,7 +2,7 @@
     {# 1. ТЕМЫ уровня #}
     <div class="topic-list">
         {% for topic in current_section.topics.all %}
-        <div class="mb-1"> {# Минимальный отступ между карточками #}
+        <div class="mb-1">
             <a href="{% url 'topic_detail' topic.pk %}" class="item-card theme-topic d-flex align-items-center">
                 <div class="item-icon bg-blue-soft text-blue">
                     <i class="bi bi-file-earmark-text-fill"></i>
@@ -20,9 +20,10 @@
     {# 2. ПОДРАЗДЕЛЫ (Аккордеон) #}
     <div class="accordion accordion-flush" id="accordion-{{ current_section.id }}">
         {% for sub in current_section.subsections.all %}
-        <div class="accordion-item border-0 bg-transparent mb-1">
+        <div class="accordion-item border-0 bg-transparent mb-1" id="accordion-item-{{ sub.id }}">
             <h2 class="accordion-header">
                 <button class="item-card theme-folder accordion-button collapsed shadow-none"
+                        id="section-btn-{{ sub.id }}"
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="#collapse-{{ sub.id }}">
@@ -39,7 +40,8 @@
             </h2>
             <div id="collapse-{{ sub.id }}" class="accordion-collapse collapse"
                  data-bs-parent="#accordion-{{ current_section.id }}">
-                <div class="accordion-body p-0 ps-3 pt-1"> {# Плотная вложенность #}
+                <div class="accordion-body p-0 ps-3 pt-1">
+                    {# РЕКУРСИЯ: вызываем этот же шаблон для вложенных подразделов #}
                     {% include "includes/section_recursive.html" with current_section=sub %}
                 </div>
             </div>

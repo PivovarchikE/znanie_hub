@@ -53,4 +53,7 @@ urlpatterns = [
     path('homework/<int:hw_id>/grade/', courses_views.grade_homework, name='grade_homework'),
     path('homework/<int:hw_id>/mark-theory/', courses_views.mark_theory_read, name='mark_theory_read'),
     path('homework/<int:hw_id>/submit/', courses_views.submit_homework, name='submit_homework'),
+
+    # Поиск
+    path('search/', courses_views.global_search_view, name='global_search'),
 ]

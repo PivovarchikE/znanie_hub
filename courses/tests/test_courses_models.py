@@ -124,7 +124,7 @@ class TestCoursesModels:
 
         assert hw.get_status_for_student(student_user) is True
 
-    def test_homework_status_practice(self, student_user, teacher_user, subject, topic):
+    def test_homework_status_practice(self, student_user, teacher_user, subject, section, topic):
         """Тест статуса для практики: выполнено, если выставлен балл (actual_score)"""
         hw = Homework.objects.create(
             student=student_user.student_profile,

@@ -5,7 +5,13 @@
 <section class="main-banner d-flex align-items-end justify-content-end text-center text-white"
          style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_math_main.jpg' %}'); background-size: cover; background-position: center 60%; min-height: 300px;">
     <div class="p-3">
-        <small class="opacity-50">Photo by McCarthy Beckan</small>
+        <small class="opacity-50">
+            Photo by <a
+                href="https://unsplash.com/@mccarthybeckan?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">McCarthy
+            Beckan</a>
+            on <a
+                href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+        </small>
     </div>
 </section>
 {% endblock hero %}
@@ -46,6 +52,66 @@
         {% endfor %}
     </div>
 </div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sectionId = urlParams.get('section_id');
+
+    if (sectionId) {
+        console.log("Поиск раздела ID:", sectionId);
+
+        const targetItem = document.getElementById(`accordion-item-${sectionId}`);
+
+        if (targetItem) {
+            // 1. Открываем родительскую вкладку (Tab)
+            const parentPane = targetItem.closest('.tab-pane');
+            if (parentPane) {
+                const tabBtn = document.querySelector(`[data-bs-target="#${parentPane.id}"]`);
+                if (tabBtn) {
+                    const tab = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                    tab.show();
+
+                    // Обновляем визуальные классы вкладок
+                    document.querySelectorAll('#mathTabs .nav-link').forEach(b => {
+                        b.classList.remove('active', 'fw-bold', 'text-secondary');
+                    });
+                    tabBtn.classList.add('active', 'fw-bold', 'text-secondary');
+                }
+            }
+
+            // 2. Раскрываем цепочку аккордеонов
+            setTimeout(() => {
+                let current = targetItem.parentElement;
+                while (current) {
+                    if (current.classList.contains('accordion-collapse')) {
+                        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(current, { toggle: false });
+                        bsCollapse.show();
+                    }
+                    current = current.parentElement;
+                }
+
+                // 3. Скролл и анимация мигания
+                setTimeout(() => {
+                    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // Добавляем класс анимации
+                    targetItem.classList.add('search-highlight');
+
+                    // Удаляем класс после завершения (через 2.5 сек), чтобы можно было повторить
+                    setTimeout(() => {
+                        targetItem.classList.remove('search-highlight');
+                    }, 2500);
+
+                }, 500);
+            }, 300);
+        } else {
+            console.error("Элемент accordion-item-" + sectionId + " не найден!");
+        }
+    }
+});
+</script>
 
 <style>
     /* Линии иерархии для визуальной связи уровней */

@@ -2,7 +2,9 @@ import json
 import sys
 
 from django.contrib import messages
+from django.contrib.postgres.search import SearchVector
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -603,3 +605,40 @@ def student_dashboard_view(request):
         'student': student_profile
     })
 
+
+@login_required
+@require_GET
+def global_search_view(request):
+    query = request.GET.get('q', '').strip()
+
+    if len(query) < 2:
+        return render(request, 'partials/search_dropdown.html', {'results': None})
+
+    results = {
+        'subjects': Subject.objects.filter(
+            name__icontains=query,
+            deleted_at__isnull=True
+        ),
+        'sections': Section.objects.filter(
+            Q(title__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('subject'),
+        'topics': Topic.objects.filter(
+            Q(title__icontains=query) | Q(text_content__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('section__subject'),
+        'simulators': SimulatorConfig.objects.filter(
+            Q(label__icontains=query) | Q(params__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('topic'),
+    }
+
+    context = {'results': results, 'query': query}
+
+    if request.htmx:
+        return render(request, 'partials/search_dropdown.html', context)
+
+    try:
+        return render(request, 'search_full_results.html', context)
+    except:
+        return render(request, 'partials/search_dropdown.html', context)
