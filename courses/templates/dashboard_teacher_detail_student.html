@@ -211,7 +211,11 @@ function showHwDetails(hwId) {
     modal.show();
 
     // Запрос к API (используем ранее созданный URL)
-    fetch(`/api/homework-results/${hwId}/`)
+    fetch(`/api/homework-results/${hwId}/`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
         .then(response => {
             if (!response.ok) throw new Error('Данные не найдены');
             return response.json();

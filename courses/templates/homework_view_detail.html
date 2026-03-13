@@ -251,7 +251,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const hwId = "{{ homework.id }}";
     if ("{{ homework.is_completed }}" === "True" && "{{ homework.hw_type }}" === "simulator") {
         const body = document.getElementById('studentDetailsBody');
-        fetch(`/api/homework-results/${hwId}/`)
+        fetch(`/api/homework-results/${hwId}/`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
             .then(res => res.json())
             .then(data => {
                 body.innerHTML = '';

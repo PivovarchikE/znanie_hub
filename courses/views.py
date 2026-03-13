@@ -16,11 +16,13 @@ from courses.forms import HomeworkForm, HomeworkFileFormSet
 from courses.models import Subject, Topic, TrainingSession, SimulatorConfig, Homework, Section, HomeworkResponseFile, \
     HomeworkComment
 from courses.services import generate_math_tasks_addition_and_substraction
+from decorators import ajax_required
 from users import models
 from users.forms import StudentProfileForm, StudentEditForm, PhoneFormSet
 from users.models import StudentProfile, TeacherProfile
 
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +176,8 @@ def save_training_result(request):
 
 
 @login_required
+@require_GET
+@ajax_required
 def get_homework_results_api(request, hw_id):
     homework = get_object_or_404(Homework, id=hw_id)
 
@@ -207,6 +211,7 @@ def get_homework_results_api(request, hw_id):
 
 
 @require_GET
+@ajax_required
 def get_sections(request):
     subject_id = request.GET.get('subject_id')
     sections = Section.objects.filter(subject_id=subject_id, parent__isnull=True)
@@ -215,6 +220,7 @@ def get_sections(request):
 
 
 @require_GET
+@ajax_required
 def get_topics(request):
     """Проверка параметров темы (теория, конфиги) через JS"""
     section_id = request.GET.get('section_id')
@@ -241,6 +247,7 @@ def get_topics(request):
 
 @login_required
 @require_GET
+@ajax_required
 def get_section_accordion(request):
     section_id = request.GET.get('section_id')
     logger.debug(f"AJAX: Fetching accordion for Section ID {section_id} (Requested by User {request.user.id})")
@@ -255,6 +262,8 @@ def get_section_accordion(request):
         return HttpResponse("Ошибка загрузки списка тем", status=500)
 
 
+@require_GET
+@ajax_required
 def get_configs(request):
     topic_id = request.GET.get('topic_id')
     configs = SimulatorConfig.objects.filter(topic_id=topic_id).values('id', 'label')
