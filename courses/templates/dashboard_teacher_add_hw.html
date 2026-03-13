@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (selectedType === 'simulator' || selectedType === 'exam') {
             if (simulatorBlock) simulatorBlock.classList.remove('d-none');
-            if (contentBlock) contentBlock.classList.add('d-none');
+            // if (contentBlock) contentBlock.classList.add('d-none'); // скрывает блок текста к тренажеру
             if (topicId) loadConfigsForTopic(topicId);
         } else {
             if (simulatorBlock) simulatorBlock.classList.add('d-none');
