@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <h2 class="mb-4 fw-bold">Результаты поиска: <span class="text-primary">"{{ query }}"</span></h2>
+
+            {% if results.subjects or results.sections or results.topics or results.simulators %}
+
+                {# 1. ПРЕДМЕТЫ #}
+                {% if results.subjects %}
+                <section class="mb-5">
+                    <h4 class="border-bottom pb-3 mb-3">📚 Предметы</h4>
+                    <div class="row row-cols-1 row-cols-md-3 g-4">
+                        {% for s in results.subjects %}
+                        <div class="col">
+                            <div class="card h-100 shadow-sm border-0 bg-light">
+                                <div class="card-body text-center p-4">
+                                    <h5 class="card-title fw-bold">{{ s.name }}</h5>
+                                    {# Предполагаем, что у каждого предмета свой index, здесь пример для math #}
+                                    <a href="{% url 'math_index' %}" class="btn btn-outline-primary btn-sm mt-2 px-4 rounded-pill">Перейти</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
+                {# 2. РАЗДЕЛЫ И ПОДРАЗДЕЛЫ (Добавлено!) #}
+                {% if results.sections %}
+                <section class="mb-5">
+                    <h4 class="border-bottom pb-3 mb-3">📂 Разделы и папки</h4>
+                    <div class="row row-cols-1 row-cols-md-2 g-3">
+                        {% for sec in results.sections %}
+                        <div class="col">
+                            {# Передаем section_id для срабатывания нашего JS с подсветкой #}
+                            <a href="{% url 'math_index' %}?section_id={{ sec.id }}" class="item-card theme-folder d-flex align-items-center text-decoration-none">
+                                <div class="item-icon bg-purple-soft text-purple">
+                                    <i class="bi bi-folder-fill"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="item-title fw-bold">{{ sec.title }}</div>
+                                    <small class="text-muted">{{ sec.subject.name|default:"Раздел курса" }}</small>
+                                </div>
+                                <i class="bi bi-chevron-right item-arrow"></i>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
+                {# 3. ТЕМЫ И ТЕОРИЯ #}
+                {% if results.topics %}
+                <section class="mb-5">
+                    <h4 class="border-bottom pb-3 mb-3">📝 Темы и теория</h4>
+                    <div class="row row-cols-1 g-2">
+                        {% for t in results.topics %}
+                        <div class="col">
+                            <a href="{% url 'topic_detail' t.id %}" class="item-card theme-topic d-flex align-items-center text-decoration-none">
+                                <div class="item-icon bg-blue-soft text-blue">
+                                    <i class="bi bi-file-earmark-text-fill"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="item-title">{{ t.title }}</div>
+                                        <span class="badge rounded-pill bg-light text-dark border fw-normal" style="font-size: 0.7rem;">
+                                            {% if t.school_class %}{{ t.school_class.name }}{% else %}Общий{% endif %}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted d-block" style="font-size: 0.8rem;">
+                                        {{ t.section.subject.name }} — {{ t.section.title }}
+                                    </small>
+                                </div>
+                                <i class="bi bi-chevron-right item-arrow"></i>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
+                {# 4. ТРЕНАЖЕРЫ #}
+                {% if results.simulators %}
+                <section class="mb-5">
+                    <h4 class="border-bottom pb-3 mb-3">⚙️ Тренажеры и практика</h4>
+                    <div class="row row-cols-1 row-cols-md-2 g-3">
+                        {% for sim in results.simulators %}
+                        <div class="col">
+                            <div class="card border-info h-100 shadow-sm" style="border-radius: 12px;">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">{{ sim.label }}</h6>
+                                        <small class="text-muted">Тема: {{ sim.topic.title }}</small>
+                                    </div>
+                                    <a href="{% url 'topic_detail' sim.topic.id %}?config={{ sim.id }}" class="btn btn-info btn-sm text-white rounded-pill px-3">Запустить</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
+            {% else %}
+                {# ПУСТОЙ РЕЗУЛЬТАТ #}
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-search text-muted opacity-25" style="font-size: 5rem;"></i>
+                    </div>
+                    <h3>К сожалению, мы ничего не нашли</h3>
+                    <p class="text-muted">Попробуйте изменить запрос или проверить раскладку клавиатуры.</p>
+                    <a href="/" class="btn btn-primary rounded-pill px-4">Вернуться на главную</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Дополнительные стили для страницы поиска, чтобы карточки выглядели как в math_index */
+    .item-card {
+        background-color: #fff;
+        border: 1px solid #edf2f7;
+        padding: 15px;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+    .item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border-color: #bee3f8;
+    }
+    .theme-folder { background-color: #fdfaff; border-color: #e9d8fd; }
+</style>
+{% endblock %}

@@ -29,6 +29,7 @@ urlpatterns = [
     path('thanks/', TemplateView.as_view(template_name='thanks.html'), name='thanks'),
     path('', include('courses.urls')),
     path('', include('users.urls')),
+    path('projects/', include('other_pages.urls')),
 ]
 
 

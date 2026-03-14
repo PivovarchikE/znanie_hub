@@ -8,7 +8,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Дашборд</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'student_detail' student.user.id %}">{{ student.user.get_full_name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'student_detail' student.id %}">{{ student.user.get_full_name }}</a></li>
                     <li class="breadcrumb-item active">Редактирование</li>
                 </ol>
             </nav>
@@ -131,7 +131,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between border-top pt-4 mt-4">
-                            <a href="{% url 'student_detail' student.user.id %}" class="btn btn-light">Отмена</a>
+                            <a href="{% url 'student_detail' student.id %}" class="btn btn-light">Отмена</a>
                             <button type="submit" class="btn btn-primary px-5 shadow-sm">Сохранить изменения</button>
                         </div>
                     </form>

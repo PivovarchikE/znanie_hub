@@ -2,37 +2,47 @@ import json
 import sys
 
 from django.contrib import messages
+from django.contrib.postgres.search import SearchVector
 from django.db import transaction
-from django.http import JsonResponse
+from django.db.models import Q
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, logger
-from django.contrib.auth import login, logout
-from django.core.paginator import Paginator
+from django.contrib.auth.forms import logger
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from courses.forms import HomeworkForm, HomeworkFileFormSet
-from courses.models import Subject, Topic, TrainingSession, SimulatorConfig, Homework, Section
+from courses.models import Subject, Topic, TrainingSession, SimulatorConfig, Homework, Section, HomeworkResponseFile, \
+    HomeworkComment
 from courses.services import generate_math_tasks_addition_and_substraction
+from decorators import ajax_required
 from users import models
 from users.forms import StudentProfileForm, StudentEditForm, PhoneFormSet
 from users.models import StudentProfile, TeacherProfile
 
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 
 @require_GET
 def math_index(request):
-    # Получаем предмет именно с названием "Математика"
-    # prefetch_related('sections__topics') оптимизирует запросы к БД
-    subject = get_object_or_404(Subject.objects.prefetch_related('sections__topics'), name="Математика")
+    subject = get_object_or_404(
+        Subject.objects.prefetch_related(
+            'sections__topics',
+            'sections__subsections__topics',
+            'sections__subsections__subsections__topics'
+        ),
+        name="Математика"
+    )
+
+    root_sections = subject.sections.filter(parent__isnull=True)
 
     context = {
         'subject': subject,
-        'sections': subject.sections.all()
+        'sections': root_sections
     }
     return render(request, 'math_index.html', context)
 
@@ -41,41 +51,60 @@ def math_index(request):
 def topic_detail(request, topic_id):
     topic = get_object_or_404(Topic, pk=topic_id)
 
-    preset_config_id = request.GET.get('config')
     homework_id = request.GET.get('hw')
+    preset_config_id = request.GET.get('config')
+    all_configs = topic.configs.all()
 
-    # Если это тренажер
-    if topic.content_type == 'simulator':
-        configs = topic.configs.all()
-        all_problems_data = {}
+    is_completed = False
+    current_homework = None
 
-        for conf in configs:
-            # Генерируем задачи для каждого конфига
+    if homework_id:
+        current_homework = Homework.objects.filter(
+            id=homework_id,
+            student__user=request.user
+        ).first()
+
+        if current_homework:
+            is_completed = current_homework.is_completed
+            # Если в URL не было конфига, берем его из домашки
+            if not preset_config_id and current_homework.simulator_config:
+                preset_config_id = str(current_homework.simulator_config.id)
+
+    all_problems_data = {}
+
+    for conf in all_configs:
+        # Логика генерации (случайные или фиксированные)
+        if conf.config_type == 'exam':
+            problems = conf.params.get('fixed_tasks', [])
+        else:
             problems = generate_math_tasks_addition_and_substraction(conf.params)
-            all_problems_data[str(conf.id)] = {
-                'label': conf.label,
-                'problems': problems
-            }
 
-        # Проверяем домашку, если ID передан
-        is_completed = False
-        if homework_id:
-            homework = Homework.objects.filter(id=homework_id).first()
-            if homework:
-                is_completed = homework.is_completed
-
-        context = {
-            'topic': topic,
-            'configs': configs,
-            'all_configs_json': all_problems_data,
-            'preset_config_id': preset_config_id,
-            'homework_id': homework_id,
-            'is_already_completed': is_completed,
+        all_problems_data[str(conf.id)] = {
+            'label': conf.label,
+            'config_type': conf.config_type,
+            'problems': problems
         }
-        return render(request, 'simulator_setup.html', context)
 
-    # Если это теория (или любой другой тип)
-    return render(request, 'theory_detail.html', {'topic': topic})
+    raw_content = topic.text_content or ""
+    slides = [s.strip() for s in raw_content.split('===') if s.strip()]
+
+    context = {
+        'topic': topic,
+        'slides': slides,
+        'slides_count': len(slides),
+        'configs': all_configs,
+        'practice_configs': all_configs.filter(config_type='practice'),
+        'exam_configs': all_configs.filter(config_type='exam'),
+        'all_configs_json': all_problems_data,
+
+        # Данные для JS-скрипта тренажера
+        'preset_config_id': preset_config_id,
+        'homework_id': homework_id,
+        'is_already_completed': is_completed,
+        'current_homework': current_homework,
+    }
+
+    return render(request, 'topic_universal_view.html', context)
 
 
 @login_required
@@ -83,16 +112,36 @@ def topic_detail(request, topic_id):
 def save_training_result(request):
     try:
         data = json.loads(request.body)
-        homework_id = data.get('homework_id') # Получаем ID из JS
+        homework_id = data.get('homework_id')
+        is_theory_only = data.get('is_theory_only', False)
 
-        # 1. Создаем запись о тренировке (общая статистика)
+        # --- БЛОК ОБРАБОТКИ ТЕОРИИ ---
+        if is_theory_only and homework_id:
+            homework = Homework.objects.filter(
+                id=homework_id,
+                student__user=request.user
+            ).first()
+
+            if homework:
+                if homework.is_completed:
+                    return JsonResponse({'status': 'success', 'message': 'Уже выполнено'})
+
+                homework.is_completed = True
+                homework.score = 100
+                homework.save()
+                logger.info(f"Теория ДЗ {homework_id} отмечена как прочитанная для {request.user}")
+                return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'error', 'message': 'ДЗ не найдено'}, status=404)
+
+        # --- СТАНДАРТНАЯ ЛОГИКА ТРЕНАЖЕРА ---
+        # Создаем запись о тренировке
         session = TrainingSession.objects.create(
             student=request.user,
             config_id=data.get('config_id'),
-            total_questions=data.get('total'),
-            solved_count=data.get('total'),
-            correct_count=data.get('correct'),
-            detailed_results=data.get('details'),
+            total_questions=data.get('total', 0),
+            solved_count=data.get('total', 0),
+            correct_count=data.get('correct', 0),
+            detailed_results=data.get('details', []),
             end_time=timezone.now()
         )
 
@@ -100,29 +149,25 @@ def save_training_result(request):
         correct = session.correct_count
         percent = int((correct / total) * 100) if total > 0 else 0
 
-        # 2. Если тренировка запущена из ДЗ, отмечаем его как выполненное
+        # Обработка ДЗ для тренажера
         if homework_id:
-            # Ищем домашку, которая принадлежит этому ученику
             homework = Homework.objects.filter(
                 id=homework_id,
                 student__user=request.user
             ).first()
 
-            # ЕСЛИ ЗАДАНИЕ УЖЕ ВЫПОЛНЕНО - НЕ СОХРАНЯЕМ НОВЫЙ РЕЗУЛЬТАТ
-            if homework and homework.is_completed:
-                logger.warning(f"Homework {homework_id} marked as completed for {request.user} and don't saves")
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Задание уже было выполнено ранее. Повторное сохранение невозможно.'
-                }, status=403)
-
             if homework:
+                # Проверка на соответствие конфига (только для тренажеров)
+                if str(homework.simulator_config_id) != str(data.get('config_id')):
+                    return JsonResponse({'status': 'error', 'message': 'Неверный конфиг'}, status=400)
+
+                if homework.is_completed:
+                    return JsonResponse({'status': 'error', 'message': 'Задание уже выполнено'}, status=403)
+
                 homework.is_completed = True
                 homework.score = percent
                 homework.save()
-                logger.info(f"Homework {homework_id} marked as completed for {request.user}")
 
-        logger.info(f"Save training result: session for {request.user} saved")
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
@@ -131,11 +176,21 @@ def save_training_result(request):
 
 
 @login_required
+@require_GET
+@ajax_required
 def get_homework_results_api(request, hw_id):
-    # Берем домашку (проверяем, что учитель имеет к ней доступ)
-    homework = get_object_or_404(Homework, id=hw_id, teacher=request.user.teacher_profile)
+    homework = get_object_or_404(Homework, id=hw_id)
 
-    # Ищем сессию
+    is_student_owner = homework.student.user == request.user
+
+    is_teacher_owner = False
+    if hasattr(request.user, 'teacher_profile'):
+        if homework.teacher == request.user.teacher_profile:
+            is_teacher_owner = True
+
+    if not (is_student_owner or is_teacher_owner):
+        return JsonResponse({'error': 'Доступ запрещен'}, status=403)
+
     session = TrainingSession.objects.filter(
         student=homework.student.user,
         config=homework.simulator_config,
@@ -143,7 +198,6 @@ def get_homework_results_api(request, hw_id):
     ).order_by('-end_time').first()
 
     if not session:
-        # Если сессия не найдена
         return JsonResponse({
             'error': 'Сессия не найдена',
             'details': f'Student ID: {homework.student.user.id}, Config ID: {homework.simulator_config.id}'
@@ -156,18 +210,60 @@ def get_homework_results_api(request, hw_id):
     })
 
 
+@require_GET
+@ajax_required
 def get_sections(request):
     subject_id = request.GET.get('subject_id')
-    sections = Section.objects.filter(subject_id=subject_id).values('id', 'title')
-    return JsonResponse(list(sections), safe=False)
+    sections = Section.objects.filter(subject_id=subject_id, parent__isnull=True)
+    data = [{'id': s.id, 'title': s.title} for s in sections]
+    return JsonResponse(data, safe=False)
 
 
+@require_GET
+@ajax_required
 def get_topics(request):
+    """Проверка параметров темы (теория, конфиги) через JS"""
     section_id = request.GET.get('section_id')
-    topics = Topic.objects.filter(section_id=section_id).values('id', 'title')
-    return JsonResponse(list(topics), safe=False)
+    if not section_id:
+        return JsonResponse([], safe=False)
+
+    # Собираем все темы раздела и его прямых подразделов в плоский список
+    # (нужно для быстрой проверки наличия теории в JS)
+    topics = Topic.objects.filter(
+        section_id=section_id
+    ) | Topic.objects.filter(
+        section__parent_id=section_id
+    )
+
+    data = [{
+        'id': t.id,
+        'title': t.title,
+        'has_theory': bool(t.text_content and t.text_content.strip()),
+        'parent_id': t.section_id
+    } for t in topics]
+
+    return JsonResponse(data, safe=False)
 
 
+@login_required
+@require_GET
+@ajax_required
+def get_section_accordion(request):
+    section_id = request.GET.get('section_id')
+    logger.debug(f"AJAX: Fetching accordion for Section ID {section_id} (Requested by User {request.user.id})")
+
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        return render(request, 'includes/section_recursive_selectable.html', {
+            'current_section': section
+        })
+    except Exception as e:
+        logger.error(f"AJAX ERROR: Failed to render accordion for Section {section_id}. Error: {e}")
+        return HttpResponse("Ошибка загрузки списка тем", status=500)
+
+
+@require_GET
+@ajax_required
 def get_configs(request):
     topic_id = request.GET.get('topic_id')
     configs = SimulatorConfig.objects.filter(topic_id=topic_id).values('id', 'label')
@@ -175,6 +271,7 @@ def get_configs(request):
 
 
 @login_required
+@require_GET
 def teacher_dashboard_view(request):
     if request.user.role.slug != 'teacher':
         return redirect('index')  # пока учеников редиректим на стратовую
@@ -188,6 +285,7 @@ def teacher_dashboard_view(request):
 
 
 @login_required
+@require_GET
 def student_detail_view(request, student_id):
     if request.user.role.slug != 'teacher':
         return redirect('index')
@@ -207,15 +305,13 @@ def student_detail_view(request, student_id):
 
 
 @login_required
+@require_http_methods(['POST', 'GET'])
 def add_homework_view(request, student_id):
-    """
-    Создание домашнего задания с файлами.
-    GET: Отображение форм.
-    POST: Валидация, сохранение задания и файлов в одной транзакции.
-    """
-    # Проверка прав (Role-based access control)
+    # Логируем попытку доступа к странице
+    logger.info(f"User ID {request.user.id} (Teacher) accessed HW creation page for Student ID {student_id}")
+
     if not hasattr(request.user, 'role') or request.user.role.slug != 'teacher':
-        logger.warning(f"User {request.user.id} attempted to access teacher view without permission.")
+        logger.warning(f"Access denied: User {request.user.id} tried to create HW without teacher role.")
         messages.error(request, "Доступ только для учителей.")
         return redirect('index')
 
@@ -225,9 +321,9 @@ def add_homework_view(request, student_id):
         teachers=request.user.teacher_profile
     )
 
-    # --- ОБРАБОТКА POST (LOGIC) ---
     if request.method == 'POST':
-        logger.info(f"Teacher {request.user.id} is creating homework for student {student_id}")
+        # Логируем входящие данные (без чувствительной инфы, если нужно)
+        logger.info(f"Processing HW submission: Teacher={request.user.id}, Student={student.user.id}")
 
         form = HomeworkForm(request.POST)
         formset = HomeworkFileFormSet(request.POST, request.FILES)
@@ -235,44 +331,41 @@ def add_homework_view(request, student_id):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # Сохраняем основное задание
                     homework = form.save(commit=False)
                     homework.student = student
                     homework.teacher = request.user.teacher_profile
                     homework.save()
 
-                    # Сохраняем M2M (если есть в форме)
-                    form.save_m2m()
+                    form.save_m2m()  # Для тегов или других ManyToMany
 
-                    # Сохраняем файлы через формсет
+                    # Сохранение файлов
                     instances = formset.save(commit=False)
                     for instance in instances:
                         instance.homework = homework
-                        # Сохраняем оригинальное имя файла для логов
-                        original_name = instance.file.name
                         instance.save()
-                        logger.debug(f"File '{original_name}' attached to HW {homework.id}")
+                        logger.debug(f"File attached: HW_ID={homework.id}, File={instance.file.name}")
 
-                    # Финализируем сохранение формсета (включая удаления)
                     formset.save_m2m()
 
-                logger.info(f"Successfully created HW ID {homework.id} for student {student.user.id}")
+                logger.info(
+                    f"SUCCESS: HW ID {homework.id} created for Student {student.user.id} by Teacher {request.user.id}")
                 messages.success(request, f"Задание '{homework.title}' успешно отправлено!")
                 return redirect('student_detail', student_id=student.id)
 
             except Exception as e:
-                logger.error(f"Transaction failed while creating HW for student {student_id}: {str(e)}", exc_info=True)
-                messages.error(request, "Системная ошибка при сохранении. Попробуйте позже.")
+                # Логируем критическую ошибку транзакции с трейсбеком
+                logger.error(f"DATABASE ERROR: Transaction failed for Student {student_id}. Error: {str(e)}",
+                             exc_info=True)
+                messages.error(request, "Системная ошибка при сохранении в базу данных.")
         else:
+            # Логируем ошибки валидации, чтобы знать, на чем спотыкаются учителя
             logger.warning(
-                f"Form validation failed for HW creation. Teacher: {request.user.id}, Errors: {form.errors} {formset.errors}")
+                f"VALIDATION FAILED: Teacher={request.user.id}. Form errors: {form.errors.as_json()}. Formset errors: {formset.errors}")
             messages.error(request, "Пожалуйста, проверьте правильность заполнения полей.")
 
-    # --- ОБРАБОТКА GET (DISPLAY) ---
     else:
         form = HomeworkForm()
         formset = HomeworkFileFormSet()
-        logger.debug(f"Displaying empty homework form for student {student_id}")
 
     return render(request, 'dashboard_teacher_add_hw.html', {
         'form': form,
@@ -283,6 +376,7 @@ def add_homework_view(request, student_id):
 
 
 @login_required
+@require_http_methods(['GET', 'POST'])
 def homework_view_detail(request, hw_id):
     homework = get_object_or_404(
         Homework.objects.select_related(
@@ -297,10 +391,9 @@ def homework_view_detail(request, hw_id):
     return render(request, 'homework_view_detail.html', {'homework': homework})
 
 
-# Редактирование задания
 @login_required
 def edit_homework_view(request, hw_id):
-    # Проверяем, что это учитель
+    """Редактирование задания"""
     if not hasattr(request.user, 'teacher_profile'):
         return redirect('student_dashboard')  # Отправляем ученика домой
 
@@ -326,13 +419,105 @@ def edit_homework_view(request, hw_id):
         'edit_mode': True
     })
 
+@login_required
+@require_http_methods(['POST'])
+def grade_practice(request, pk):
+    homework = get_object_or_404(Homework, pk=pk, teacher=request.user.teacherprofile)
+    if request.method == 'POST':
+        score = request.POST.get('actual_score')
+        homework.actual_score = score
+        homework.is_completed = True
+        homework.save()
+        return redirect('homework_view_detail', pk=pk)
+
 
 @login_required
+@require_http_methods(['POST', 'GET'])
+def upload_hw_response(request, hw_id):
+    homework = get_object_or_404(Homework, id=hw_id)
+
+    if request.method == 'POST':
+        files = request.FILES.getlist('files')
+        if not files:
+            messages.warning(request, "Вы не выбрали ни одного файла.")
+            return redirect('homework_view_detail', pk=hw_id)
+
+        for f in files:
+            HomeworkResponseFile.objects.create(homework=homework, file=f)
+
+        messages.success(request, f"Успешно загружено файлов: {len(files)}. Ожидайте проверки учителем.")
+
+    return redirect('homework_view_detail', hw_id=hw_id)
+
+
+@login_required
+@require_http_methods(['POST', 'GET'])
+def grade_homework(request, hw_id):
+    homework = get_object_or_404(Homework, id=hw_id)
+    if request.method == 'POST' and request.user.role.slug == 'teacher':
+        action = request.POST.get('action')
+        score = request.POST.get('actual_score')
+        comment_text = request.POST.get('teacher_comment')
+
+        if comment_text:
+            HomeworkComment.objects.create(
+                homework=homework,
+                author=request.user,
+                text=comment_text
+            )
+
+        if action == 'accept':
+            homework.status = 'completed'
+            homework.is_completed = True
+            homework.actual_score = score
+        elif action == 'reject':
+            homework.status = 'correction'
+            homework.is_completed = False
+
+        homework.save()
+    return redirect('homework_view_detail', hw_id=hw_id)
+
+
+@login_required
+@require_http_methods(['POST', 'GET'])
+def mark_theory_read(request, hw_id):
+    homework = get_object_or_404(Homework, id=hw_id)
+
+    if request.user.role.slug == 'teacher' and not homework.is_completed:
+        if request.method == 'POST':
+            homework.is_completed = True
+            # Для теории баллы не выставляем (остается None или 0)
+            homework.save()
+            messages.success(request, f"Теория по теме «{homework.title}» подтверждена.")
+
+    return redirect('homework_view_detail', hw_id=hw_id)
+
+
+@login_required
+@require_http_methods(['POST', 'GET'])
+def submit_homework(request, hw_id):
+    homework = get_object_or_404(Homework, id=hw_id, student__user=request.user)
+    if request.method == 'POST':
+        comment_text = request.POST.get('student_comment')
+        if comment_text:
+            HomeworkComment.objects.create(
+                homework=homework,
+                author=request.user,
+                text=comment_text
+            )
+
+        homework.status = 'review'
+        homework.save()
+        messages.success(request, "Работа отправлена на проверку!")
+    return redirect('homework_view_detail', hw_id=hw_id)
+
+
+@login_required
+@require_http_methods(['POST', 'GET'])
 def delete_homework_view(request, hw_id):
     if not hasattr(request.user, 'role') or request.user.role.slug != 'teacher':
         return redirect('index')
 
-    # Ищем задание, проверяя, что оно принадлежит именно этому учителю
     homework = get_object_or_404(Homework, id=hw_id, teacher=request.user.teacher_profile)
     student_id = homework.student.id
 
@@ -348,6 +533,7 @@ def delete_homework_view(request, hw_id):
 
 
 @login_required
+@require_http_methods(['POST', 'GET'])
 @transaction.atomic
 def edit_student_view(request, student_id):
     student_profile = get_object_or_404(
@@ -406,6 +592,7 @@ def delete_student_view(request, student_id):
 
 
 @login_required
+@require_GET
 def student_dashboard_view(request):
     if request.user.role.slug != 'student':
         return redirect('index')
@@ -427,3 +614,40 @@ def student_dashboard_view(request):
         'student': student_profile
     })
 
+
+@login_required
+@require_GET
+def global_search_view(request):
+    query = request.GET.get('q', '').strip()
+
+    if len(query) < 2:
+        return render(request, 'partials/search_dropdown.html', {'results': None})
+
+    results = {
+        'subjects': Subject.objects.filter(
+            name__icontains=query,
+            deleted_at__isnull=True
+        ),
+        'sections': Section.objects.filter(
+            Q(title__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('subject'),
+        'topics': Topic.objects.filter(
+            Q(title__icontains=query) | Q(text_content__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('section__subject'),
+        'simulators': SimulatorConfig.objects.filter(
+            Q(label__icontains=query) | Q(params__icontains=query),
+            deleted_at__isnull=True
+        ).select_related('topic'),
+    }
+
+    context = {'results': results, 'query': query}
+
+    if request.htmx:
+        return render(request, 'partials/search_dropdown.html', context)
+
+    try:
+        return render(request, 'search_full_results.html', context)
+    except:
+        return render(request, 'partials/search_dropdown.html', context)

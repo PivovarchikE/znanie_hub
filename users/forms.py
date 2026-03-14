@@ -37,7 +37,8 @@ class UserRegistrationForm(forms.ModelForm):
         label='Отчество',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': ''})
+            'placeholder': ''}),
+        required=False
     )
 
     email = forms.EmailField(
@@ -46,6 +47,7 @@ class UserRegistrationForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'ivanov@yandex.by'
         }),
+        required=False,
         help_text="Мы отправим подтверждение на этот адрес."
     )
 
@@ -70,7 +72,8 @@ class UserRegistrationForm(forms.ModelForm):
             'class': 'form-control',
             'type': 'date',
             'placeholder': ''
-        })
+        }),
+        required=False
     )
 
     def clean(self):

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block hero %}
+<section class="main-banner d-flex align-items-end justify-content-end text-center text-white"
+         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_math_main.jpg' %}'); background-size: cover; background-position: center 60%; min-height: 300px;">
+    <div class="p-3">
+        <small class="opacity-50">
+            Photo by <a
+                href="https://unsplash.com/@mccarthybeckan?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">McCarthy
+            Beckan</a>
+            on <a
+                href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+        </small>
+    </div>
+</section>
+{% endblock hero %}
+
+{% block content %}
+<div class="container-fluid px-md-5 mt-5 mb-5">
+
+    {# Хлебные крошки (выводятся один раз) #}
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'math_index' %}">Математика</a></li>
+            <li class="breadcrumb-item active">{{ topic.title }}</li>
+        </ol>
+    </nav>
+
+    {# Уведомление о выполнении #}
+    {% if is_already_completed %}
+        <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm border-0">
+            <span class="fs-3 me-3">✅</span>
+            <div>
+                <h5 class="fw-bold mb-0">Задание выполнено</h5>
+                <small>Вы успешно изучили этот материал. Он всегда доступен вам для повторения.</small>
+            </div>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-sm btn-outline-success ms-auto">В личный кабинет</a>
+        </div>
+    {% endif %}
+
+    <div id="setupScreen">
+        <div class="row">
+            {# --- ЛЕВАЯ КОЛОНКА: ТЕОРИЯ --- #}
+            <div class="col-lg-7 mb-4">
+                <div class="card shadow-sm border-0 p-0 overflow-hidden h-100">
+                    <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center">
+                        <h4 class="fw-bold mb-0">📖 Теоретический материал</h4>
+                        {# Показываем счетчик только если есть слайды #}
+                        {% if slides %}
+                            <span class="badge rounded-pill bg-primary px-3 py-2 fw-normal" id="stepBadge">
+                                Шаг 1 из {{ slides_count }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-body p-4">
+                        {% if slides %}
+                            <div class="progress mb-4" style="height: 6px; background-color: #e9ecef;">
+                                <div id="theory-progress" class="progress-bar bg-success transition-all" role="progressbar" style="width: 0%;"></div>
+                            </div>
+
+                            <div id="slides-container" style="min-height: 300px;">
+                                {% for slide in slides %}
+                                <div class="theory-slide d-none animate__animated animate__fadeIn" data-slide-index="{{ forloop.counter0 }}">
+                                    <div class="slide-content fs-5" style="line-height: 1.7; color: #334155;">
+                                        {{ slide|safe }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {# Заглушка, если теории нет #}
+                            <div class="text-center py-5">
+                                <div class="display-1 mb-3">📝</div>
+                                <h5 class="text-dark">Материал в разработке</h5>
+                                <p class="text-muted">Скоро здесь появятся интересные слайды с теорией.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {# Футер показываем только если есть слайды #}
+                    {% if slides %}
+                    <div class="card-footer p-4 bg-white border-top-0 d-flex justify-content-between align-items-center">
+                        <button id="prev-slide" class="btn btn-outline-primary rounded-pill px-4 py-2" disabled>
+                            <i class="bi bi-arrow-left"></i> Назад
+                        </button>
+
+                        <div id="finishTheoryBlock" class="d-none animate__animated animate__bounceIn">
+                            {% if current_homework.hw_type == 'theory' or current_homework.include_site_theory %}
+                                {% if not is_already_completed %}
+                                    <button id="markTheoryDone" class="btn btn-success rounded-pill px-4 py-2 shadow-sm">
+                                        ✅ Я изучил материал
+                                    </button>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        <button id="next-slide" class="btn btn-primary rounded-pill px-4 py-2">
+                            Далее <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# --- ПРАВАЯ КОЛОНКА: ТРЕНАЖЕРЫ --- #}
+            <div class="col-lg-5 mb-4">
+                {# Блокируем тренажеры только если ДЗ было именно типа "тренажер" и оно выполнено #}
+                <div class="{% if is_already_completed and current_homework.hw_type == 'simulator' %}opacity-50 pe-none{% endif %}">
+
+                    <div class="card shadow-sm border-0 p-4 mb-4">
+                        <h4 class="fw-bold mb-3">🧩 Тренировка</h4>
+                        <p class="text-muted small">Случайные примеры для отработки навыка</p>
+                        <div class="d-grid gap-2">
+                            {% for conf in practice_configs %}
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-lg text-start config-select-btn
+                                               {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}opacity-50{% endif %}"
+                                        data-id="{{ conf.id }}"
+                                        {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}disabled{% endif %}>
+                                    <i class="bi bi-play-circle me-2"></i> {{ conf.label }}
+                                    {% if preset_config_id and preset_config_id == conf.id|stringformat:'s' %}
+                                        <span class="badge bg-primary ms-2">ВАШЕ ЗАДАНИЕ</span>
+                                    {% endif %}
+                                </button>
+                            {% empty %}
+                                <p class="small text-secondary">Тренажеры скоро появятся.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if exam_configs %}
+                    <div class="card shadow-sm border-0 p-4 bg-light border-start border-warning border-4">
+                        <h4 class="fw-bold mb-3 text-dark">📝 Самостоятельная работа</h4>
+                        <div class="d-grid gap-2">
+                            {% for conf in exam_configs %}
+                                <button type="button"
+                                        class="btn btn-warning btn-lg text-start config-select-btn
+                                               {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}opacity-50{% endif %}"
+                                        data-id="{{ conf.id }}"
+                                        {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}disabled{% endif %}>
+                                    <i class="bi bi-pencil-square me-2"></i> {{ conf.label }}
+                                </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {# Кнопка старта (появляется при выборе режима) #}
+                    <div id="selectedModeInfo" class="mt-4 d-none">
+                        <div class="alert alert-info border-0 shadow-sm">
+                            Выбран режим: <strong id="currentModeLabel"></strong>
+                        </div>
+                        <div class="d-grid">
+                            <button id="startWorkoutBtn" class="btn btn-success btn-lg py-3 shadow">Начать выполнение</button>
+                        </div>
+                    </div>
+                </div>
+
+                {% if is_already_completed and current_homework.hw_type == 'simulator' %}
+                    <div class="alert alert-warning border-0 shadow-sm text-center mt-3">
+                        Повторная попытка в этом ДЗ недоступна.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# --- ЭКРАН ТРЕНИРОВКИ --- #}
+    <div id="workoutScreen" class="d-none">
+        <div class="card shadow border-0 p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <button class="btn btn-outline-secondary" onclick="window.location.reload()">← К теории</button>
+                <div id="timer" class="fw-bold text-primary fs-3">00:00</div>
+                <div class="text-muted">Прогресс: <span id="currentStep">1</span>/5</div>
+            </div>
+            <div class="progress mt-3" style="height: 10px;">
+                <div id="progressBar" class="progress-bar bg-success" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="card shadow border-0 py-5 text-center">
+            <div class="card-body">
+                <h1 class="display-1 fw-bold mb-4" id="expression">...</h1>
+                <div class="d-flex justify-content-center mb-4">
+                    <input type="number" id="userAnswer" class="form-control form-control-lg w-25 text-center shadow-sm" style="font-size: 3rem; height: 100px;" autofocus>
+                </div>
+                <button id="nextBtn" class="btn btn-primary btn-lg px-5 py-3 fs-4">Ответить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "includes/simulator_modal.html" %}
+
+{{ all_configs_json|json_script:"all-configs-data" }}
+
+<script>
+    const CONFIG_DATA = {
+        presetConfigId: "{{ preset_config_id|default:'' }}",
+        assignmentId: "{{ homework_id|default:'' }}",
+        isAlreadyCompleted: {{ is_already_completed|yesno:"true,false" }},
+        csrfToken: "{{ csrf_token }}",
+        isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }}
+    };
+
+</script>
+<script src="{% static 'js/simulator.js' %}"></script>
+
+<style>
+    .pe-none { pointer-events: none; }
+    .theory-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; }
+</style>
+{% endblock %}

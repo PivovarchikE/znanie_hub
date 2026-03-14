@@ -37,6 +37,7 @@ urlpatterns = [
 
     # Пути для AJAX-запросов (динамическая подгрузка)
     path('ajax/get-sections/', courses_views.get_sections, name='ajax_get_sections'),
+    path('ajax/get-accordion/', courses_views.get_section_accordion, name='ajax_get_accordion'),
     path('ajax/get-topics/', courses_views.get_topics, name='ajax_get_topics'),
     path('ajax/get-configs/', courses_views.get_configs, name='ajax_get_configs'),
 
@@ -46,4 +47,13 @@ urlpatterns = [
     path('topic/<int:topic_id>/', courses_views.topic_detail, name='topic_detail'),
     # сохранение результатов
     path('save_training_result/', courses_views.save_training_result, name='save_training_result'),
+
+    # Проверка и выполнение домашки
+    path('homework/<int:hw_id>/upload/', courses_views.upload_hw_response, name='upload_hw_response'),
+    path('homework/<int:hw_id>/grade/', courses_views.grade_homework, name='grade_homework'),
+    path('homework/<int:hw_id>/mark-theory/', courses_views.mark_theory_read, name='mark_theory_read'),
+    path('homework/<int:hw_id>/submit/', courses_views.submit_homework, name='submit_homework'),
+
+    # Поиск
+    path('search/', courses_views.global_search_view, name='global_search'),
 ]
