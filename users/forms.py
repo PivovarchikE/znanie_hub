@@ -155,7 +155,6 @@ class UserPhoneNumberForm(forms.ModelForm):
         # ДЕЛАЕМ ПОЛЯ НЕОБЯЗАТЕЛЬНЫМИ (чтобы не вылетало "This field is required")
         self.fields['is_primary'].required = False
         self.fields['relationship'].required = False
-        self.fields['is_primary'].required = False
 
     class Meta:
         model = UserPhoneNumber
@@ -260,4 +259,13 @@ class StudentEditForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
+        }
+
+
+class AvatarUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['avatar']
+        widgets = {
+            'avatar': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
