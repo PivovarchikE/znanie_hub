@@ -40,7 +40,17 @@
             <div class="d-flex gap-2 flex-shrink-0">
                 {% if request.user.role.slug == 'teacher' %}
                     <a href="{% url 'student_detail' homework.student.id %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> Назад</a>
-                    <a href="{% url 'edit_homework' homework.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> Редактировать</a>
+                    {% if not homework.is_completed %}
+                        {# Кнопка активна, если задание не выполнено #}
+                        <a href="{% url 'edit_homework' homework.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i> Редактировать
+                        </a>
+                    {% else %}
+                        {# Кнопка заблокирована (визуально), если задание выполнено #}
+                        <button class="btn btn-outline-secondary btn-sm" disabled title="Нельзя редактировать выполненное задание">
+                            <i class="bi bi-pencil"></i> Редактировать
+                        </button>-
+                    {% endif %}
                 {% else %}
                     <a href="{% url 'student_dashboard' %}" class="btn btn-light btn-sm">← К моим заданиям</a>
                 {% endif %}
@@ -52,6 +62,14 @@
         {# --- КОНТЕНТ ЗАДАНИЯ --- #}
         <div class="homework-body">
             {% if homework.hw_type == 'simulator' %}
+
+                {% if homework.content %}
+                    <div class="homework-content mb-4">
+                        <h5 class="fw-bold mb-3">Инструкции к тренажеру:</h5>
+                        <div class="p-4 bg-white rounded border shadow-sm" style="white-space: pre-line;">{{ homework.content }}</div>
+                    </div>
+                {% endif %}
+
                 {% if homework.is_completed %}
                     <div class="card bg-light border-0 mb-4 shadow-sm">
                         <div class="card-body p-4">
@@ -251,7 +269,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const hwId = "{{ homework.id }}";
     if ("{{ homework.is_completed }}" === "True" && "{{ homework.hw_type }}" === "simulator") {
         const body = document.getElementById('studentDetailsBody');
-        fetch(`/api/homework-results/${hwId}/`)
+        fetch(`/api/homework-results/${hwId}/`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
             .then(res => res.json())
             .then(data => {
                 body.innerHTML = '';
