@@ -91,6 +91,13 @@ class User(AbstractUser, BaseModel):
 
     date_of_birth = models.DateField(blank=True, null=True)
 
+    avatar = models.ImageField(
+        upload_to='avatars/%Y/%m/',
+        null=True,
+        blank=True,
+        verbose_name="Аватар"
+    )
+
     def clean(self):
         super().clean()
         if self.date_of_birth and self.date_of_birth > date.today():

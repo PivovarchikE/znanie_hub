@@ -552,3 +552,32 @@ html {
 #detailedResults {
     transition: all 0.3s ease;
 }
+
+/* Стили для работы с аватаром/фото */
+/* Делаем область обрезки круглой */
+.cropper-view-box,
+.cropper-face {
+    border-radius: 50%;
+}
+
+/* Настройка контейнера для обрезки */
+#cropper-wrapper {
+    background-color: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+/* Стили для того, чтобы рамка не вылезала за пределы */
+.cropper-container {
+    max-width: 100% !important;
+}
+#submit-avatar-btn {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

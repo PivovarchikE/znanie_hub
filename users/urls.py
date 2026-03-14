@@ -24,7 +24,7 @@ from users import views as users_views
 
 urlpatterns = [
     # registration
-    path('select-role/', users_views.select_role, name='select_role'),
+    path('select-role/', TemplateView.as_view(template_name='registration/register_select_role.html'), name='select_role'),
 
     # <slug:role_slug> — это "ловушка", которая поймает любое слово после /register/
     path('register/<slug:role_slug>/', users_views.dynamic_register_view, name='dynamic_register'),
@@ -33,4 +33,6 @@ urlpatterns = [
 
     # profile and dashboards
     path('profile_edit/', users_views.profile_edit_view, name='profile_edit'),
+    path('profile/avatar/', users_views.avatar_update_view, name='avatar_update'),
+    path('profile/password/', users_views.UserPasswordChangeView.as_view(), name='password_change'),
 ]
