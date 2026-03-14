@@ -1,5 +1,9 @@
+import os
+import shutil
+
 import pytest
 
+from config import settings
 from courses.models import Subject, Section, Topic
 from users.models import Role
 
@@ -73,3 +77,11 @@ def homework(student_user, teacher_user, subject, topic, simulator_config):
         title="ДЗ по математике",
         hw_type="simulator"
     )
+
+
+@pytest.fixture(autouse=True)
+def cleanup_media():
+    yield
+    # Логика удаления папки после завершения теста
+    if os.path.exists(settings.MEDIA_ROOT):
+        shutil.rmtree(settings.MEDIA_ROOT)

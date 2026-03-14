@@ -6,7 +6,6 @@ from .models import Homework, HomeworkFile, SimulatorConfig, Section, Topic
 class HomeworkForm(ModelForm):
     class Meta:
         model = Homework
-        # Поля остаются теми же, но логика их наполнения изменится
         fields = ['subject', 'section', 'topic', 'hw_type', 'title', 'content', 'simulator_config', 'deadline', 'include_site_theory']
         widgets = {
             'subject': Select(attrs={'class': 'form-select', 'id': 'id_subject'}),

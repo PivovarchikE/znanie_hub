@@ -204,7 +204,7 @@ class TestCoursesAPI:
     def test_get_topics_ajax(self, client, section, topic):
         """Тест возврата JSON списка тем для раздела"""
         url = reverse('ajax_get_topics')
-        response = client.get(url, {'section_id': section.id})
+        response = client.get(url, {'section_id': section.id}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         assert response.status_code == 200
         data = response.json()
         assert data[0]['title'] == topic.title
@@ -214,7 +214,7 @@ class TestCoursesAPI:
         """Тест подгрузки HTML-куска для аккордеона через AJAX"""
         client.force_login(teacher_user)
         url = reverse('ajax_get_accordion')
-        response = client.get(url, {'section_id': section.id})
+        response = client.get(url, {'section_id': section.id}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
 
         assert response.status_code == 200
         content = response.content.decode('utf-8')
