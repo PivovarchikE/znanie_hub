@@ -1,16 +1,9 @@
 {% extends "base.html" %}
 {% load static %}
 
-
 {% block hero %}
 <section class="main-banner d-flex align-items-end justify-content-end text-center text-white"
-         style="
-            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_math_main.jpg' %}');
-            background-size: cover;
-            background-position: center 60%;
-            min-height: 500px;
-        ">
-
+         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_math_main.jpg' %}'); background-size: cover; background-position: center 60%; min-height: 300px;">
     <div class="p-3">
         <small class="opacity-50">
             Photo by <a
@@ -20,59 +13,112 @@
                 href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
         </small>
     </div>
-    </div>
 </section>
 {% endblock hero %}
 
-
 {% block content %}
-
 <div class="container mt-5">
-    <h1 class="mb-4">{{ subject.name }}</h1>
+    <h1 class="mb-4 fw-bold">{{ subject.name }}</h1>
 
     <ul class="nav nav-tabs border-bottom" id="mathTabs" role="tablist">
         {% for section in sections %}
-        <li class="nav-item" role="presentation">
-            <button class="nav-link {% if forloop.first %}active fw-bold text-secondary{% else %}custom-tab-link{% endif %} border-bottom-0"
-                    id="section-tab-{{ section.pk }}"
-                    data-bs-toggle="tab"
-                    data-bs-target="#section-content-{{ section.pk }}"
-                    type="button" role="tab">
-                {{ section.title }}
-            </button>
-        </li>
+            {% if not section.parent %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if forloop.first %}active fw-bold text-secondary{% else %}custom-tab-link{% endif %} border-bottom-0"
+                        id="section-tab-{{ section.pk }}"
+                        data-bs-toggle="tab"
+                        data-bs-target="#section-content-{{ section.pk }}"
+                        type="button" role="tab">
+                    {{ section.title }}
+                </button>
+            </li>
+            {% endif %}
         {% endfor %}
-
     </ul>
 
-<div class="tab-content border-top pt-0" id="mathTabsContent"> {% for section in sections %}
-    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
-         id="section-content-{{ section.pk }}" role="tabpanel">
+    <div class="tab-content border-top pt-4" id="mathTabsContent">
+        {% for section in sections %}
+            {% if not section.parent %}
+            <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+                 id="section-content-{{ section.pk }}" role="tabpanel">
 
-        <ul class="custom-list">
-            {% for topic in section.topics.all %}
-            <li>
-                <a href="{% url 'topic_detail' topic.pk %}" class="text-decoration-none" style="color: inherit;">
-                    <strong class="topic-title">{{ topic.title }}</strong>
-                </a>
-
-                {% if topic.content_type == 'simulator' %}
-                <span class="badge rounded-pill bg-light text-info border ms-2"
-                      style="font-size: 0.7rem; vertical-align: middle;">Тренажер</span>
-                {% endif %}
-
-                {% if topic.description %}
-                <div class="small text-muted ps-0 mt-1">{{ topic.description }}</div>
-                {% endif %}
-            </li>
-            {% empty %}
-            <li class="text-muted">В этом разделе пока нет доступных тем.</li>
-            {% endfor %}
-        </ul>
-
+                <div class="row">
+                    <div class="col-lg-9">
+                        {% include "includes/section_recursive.html" with current_section=section %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
 
 
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sectionId = urlParams.get('section_id');
+
+    if (sectionId) {
+        console.log("Поиск раздела ID:", sectionId);
+
+        const targetItem = document.getElementById(`accordion-item-${sectionId}`);
+
+        if (targetItem) {
+            // 1. Открываем родительскую вкладку (Tab)
+            const parentPane = targetItem.closest('.tab-pane');
+            if (parentPane) {
+                const tabBtn = document.querySelector(`[data-bs-target="#${parentPane.id}"]`);
+                if (tabBtn) {
+                    const tab = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                    tab.show();
+
+                    // Обновляем визуальные классы вкладок
+                    document.querySelectorAll('#mathTabs .nav-link').forEach(b => {
+                        b.classList.remove('active', 'fw-bold', 'text-secondary');
+                    });
+                    tabBtn.classList.add('active', 'fw-bold', 'text-secondary');
+                }
+            }
+
+            // 2. Раскрываем цепочку аккордеонов
+            setTimeout(() => {
+                let current = targetItem.parentElement;
+                while (current) {
+                    if (current.classList.contains('accordion-collapse')) {
+                        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(current, { toggle: false });
+                        bsCollapse.show();
+                    }
+                    current = current.parentElement;
+                }
+
+                // 3. Скролл и анимация мигания
+                setTimeout(() => {
+                    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // Добавляем класс анимации
+                    targetItem.classList.add('search-highlight');
+
+                    // Удаляем класс после завершения (через 2.5 сек), чтобы можно было повторить
+                    setTimeout(() => {
+                        targetItem.classList.remove('search-highlight');
+                    }, 2500);
+
+                }, 500);
+            }, 300);
+        } else {
+            console.error("Элемент accordion-item-" + sectionId + " не найден!");
+        }
+    }
+});
+</script>
+
+<style>
+    /* Линии иерархии для визуальной связи уровней */
+    .recursive-wrapper { border-left: 2px solid #f0f0f0; margin-left: 0.5rem; padding-left: 1.5rem; position: relative; }
+    .subsection-title { color: #6c757d; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; margin-top: 2rem; margin-bottom: 1rem; }
+    .topic-item { list-style: none; padding: 12px 0; border-bottom: 1px solid #f8f9fa; }
+    .topic-item:last-child { border-bottom: none; }
+    .topic-link:hover .topic-title { color: #0d6efd; text-decoration: underline; }
+</style>
 {% endblock %}

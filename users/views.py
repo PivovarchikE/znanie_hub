@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db import transaction
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -13,19 +14,16 @@ from users.forms import TeacherProfileForm, StudentProfileForm, UserRegistration
     BasePhoneFormSet, UserProfileEditForm
 from users.models import StudentProfile, TeacherProfile, Role, UserPhoneNumber
 
-
+# перенести в логику teamplate
 def select_role(request):
     return render(request, 'registration/register_select_role.html')
 
 
 # добавить транзакции для сохранения
+# добвить декораторы типов запросов
 # from.form
 def dynamic_register_view(request, role_slug):
-    # Находим роль в базе данных по слагу из URL
     role = get_object_or_404(Role, slug=role_slug)
-
-    # Определяем, какую форму профиля использовать
-    # (маппинг 'слаг': 'класс_формы')
     form_map = {
         'teacher': TeacherProfileForm,
         'student': StudentProfileForm,
@@ -38,72 +36,52 @@ def dynamic_register_view(request, role_slug):
     if request.method == 'POST':
         u_form = UserRegistrationForm(request.POST)
         p_form = profile_form_class(request.POST)
-
-        phone_formset = PhoneFormSet(
-            request.POST,
-            form_kwargs={'role_slug': role_slug}
-        )
-
-        phone_formset.role_slug = role_slug
+        phone_formset = PhoneFormSet(request.POST, form_kwargs={'role_slug': role_slug})
 
         if u_form.is_valid() and p_form.is_valid() and phone_formset.is_valid():
-            # Сохраняем пользователя (User)
-            # Используем commit=False, чтобы успеть захешировать пароль и назначить роль
-            user = u_form.save(commit=False)
+            try:
+                with transaction.atomic():
+                    # 1. Сохраняем User
+                    user = u_form.save(commit=False)
+                    user.set_password(u_form.cleaned_data.get('password'))
+                    user.role = role
+                    user.save()
+                    u_form.save_m2m()
 
-            # Берем "сырой" пароль из очищенных данных формы
-            raw_password = u_form.cleaned_data.get('password')
+                    # 2. Сохраняем Profile
+                    profile = p_form.save(commit=False)
+                    profile.user = user
+                    profile.save()
+                    p_form.save_m2m()
 
-            # Хешируем его
-            user.set_password(raw_password)
+                    # 3. ПРИВЯЗКА УЧИТЕЛЯ
+                    if role_slug == 'student' and request.user.is_authenticated:
+                        if hasattr(request.user, 'teacher_profile'):
+                            # Используем .add(), так как teachers — это ManyToManyField
+                            profile.teachers.add(request.user.teacher_profile)
 
-            user.role = role
-            user.save()
+                    # 4. Сохраняем телефоны
+                    phones = phone_formset.save(commit=False)
+                    for phone in phones:
+                        phone.user = user
+                        if role.slug == 'teacher':
+                            phone.relationship = UserPhoneNumber.RelationshipType.OWN
+                        phone.save()
 
-            # СРАЗУ сохраняем M2M для пользователя (например, предметы 'subjects')
-            # так как объект user уже получил ID в базе
-            u_form.save_m2m()
+                    phone_formset.save_m2m()
+                    for obj in phone_formset.deleted_objects:
+                        obj.delete()
 
-            # Сохраняем профиль (TeacherProfile или StudentProfile)
-            profile = p_form.save(commit=False)
-            profile.user = user  # Привязываем профиль к только что созданному юзеру
+                # Редиректы после успешной транзакции
+                if request.user.is_authenticated and request.user.role.slug == 'teacher':
+                    messages.success(request, f'Ученик {user.get_full_name()} успешно зарегистрирован и добавлен в ваш список.')
+                    return redirect('teacher_dashboard')
 
-            # если регистрировал учитель, то привязываем его id к профилю студента
-            if role_slug == 'student' and request.user.is_authenticated:
-                if hasattr(request.user, 'role') and request.user.role.slug == 'teacher':
-                    # Привязываем к полю teacher в StudentProfile профиль текущего юзера
-                    profile.teacher = request.user.teacher_profile
+                messages.success(request, 'Вы успешно зарегистрированы! Войдите в систему')
+                return redirect('login')
 
-            profile.save()
-
-            # Сохраняем M2M для профиля (например, 'school_classes' у учителя)
-            p_form.save_m2m()
-
-            # Сохраняем телефоны из Formset
-            # Здесь тоже используем commit=False, чтобы вручную привязать каждый телефон к юзеру
-            phones = phone_formset.save(commit=False)
-            for phone in phones:
-                phone.user = user
-                # Если это учитель, сохраняем только тип "Личный", даже если во фронтенде что-то подменили
-                if role.slug == 'teacher':
-                    phone.relationship = UserPhoneNumber.RelationshipType.OWN
-                phone.save()
-
-            # Обработка удалений (если юзер нажал на кнопку удаления существующих)
-            for obj in phone_formset.deleted_objects:
-                obj.delete()
-
-            # Если в формсете были удаления (can_delete=True), это их обработает
-            phone_formset.save_m2m()
-
-            if request.user.is_authenticated and request.user.role.slug == 'teacher':
-                messages.success(request,
-                                 f'Ученик {user.get_full_name()} успешно зарегистрирован и добавлен в ваш список.')
-                return redirect('teacher_dashboard')
-
-            messages.success(request, 'Вы успешно зарегистрировались! Войдите в систему.')
-
-            return redirect('login')
+            except Exception as e:
+                messages.error(request, f'Ошибка при сохранении: {e}')
 
     else:
         # GET

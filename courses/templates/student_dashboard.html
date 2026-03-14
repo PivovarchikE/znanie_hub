@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block hero %}
+<section class="main-banner d-flex align-items-center justify-content-center text-center text-white"
+         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_main.jpg' %}');">
+    <div class="container py-5">
+        <h1 class="display-3 fw-bold mt-5">Знание HUB</h1>
+        <p class="lead mb-4">Твое пространство для учебы и развития</p>
+        <div class="mb-5">
+            <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
+        </div>
+    </div>
+</section>
+{% endblock hero %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="fw-bold mb-0">Мои домашние задания</h3>
+                <span class="badge bg-primary rounded-pill">{{ homeworks.count }} заданий</span>
+            </div>
+
+            {% if homeworks %}
+                <div class="row">
+                    {% for hw in homeworks %}
+                    <div class="col-12 mb-3">
+                        <div class="card shadow-sm border-0 transition-hover {% if hw.is_completed %}completed-card opacity-75{% endif %}"
+                             style="border-radius: 15px; overflow: hidden; border-left: 5px solid
+                             {% if hw.status == 'correction' %}#ffc107{% elif hw.is_completed %}#198754{% elif hw.status == 'review' %}#0dcaf0{% else %}#0d6efd{% endif %} !important;">
+
+                            <div class="card-body p-4">
+                                <div class="row align-items-center">
+                                    <div class="col-md-8">
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                            <span class="badge bg-light text-dark border px-2">{{ hw.subject.name }}</span>
+
+                                            {# Динамические статусы #}
+                                            {% if hw.is_completed %}
+                                                <span class="badge bg-success-subtle text-success border border-success small">
+                                                    <i class="bi bi-check-circle-fill me-1"></i> Выполнено
+                                                </span>
+                                            {% elif hw.status == 'review' %}
+                                                <span class="badge bg-info-subtle text-info border border-info small">
+                                                    <i class="bi bi-eye me-1"></i> На проверке
+                                                </span>
+                                            {% elif hw.status == 'correction' %}
+                                                <span class="badge bg-warning-subtle text-danger border border-warning small fw-bold">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i> Нужны исправления
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary-subtle text-primary border border-primary small">
+                                                    <i class="bi bi-pencil me-1"></i> Ждет решения
+                                                </span>
+                                            {% endif %}
+
+                                            <span class="text-muted small ms-md-2">
+                                                <i class="bi bi-calendar3 me-1"></i> до {{ hw.deadline|date:"d.m H:i" }}
+                                            </span>
+                                        </div>
+
+                                        <h4 class="fw-bold mb-1 {% if hw.is_completed %}text-muted text-decoration-line-through{% endif %}">
+                                            {{ hw.title }}
+                                        </h4>
+
+                                        <div class="d-flex align-items-center gap-3 mt-2">
+                                            {% if hw.hw_type == 'simulator' %}
+                                                <small class="text-primary"><i class="bi bi-cpu me-1"></i> Тренажер</small>
+                                            {% elif hw.hw_type == 'theory' %}
+                                                <small class="text-info"><i class="bi bi-book me-1"></i> Теория</small>
+                                            {% else %}
+                                                <small class="text-secondary"><i class="bi bi-journal-text me-1"></i> Практика</small>
+                                            {% endif %}
+
+                                            {% if hw.topic %}
+                                                <small class="text-muted">| {{ hw.topic.title|truncatechars:30 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            {% if hw.is_completed %}
+                                <div class="mb-2">
+                                    {% if hw.hw_type == 'theory' %}
+                                        {# Для теории вместо баллов показываем иконку успеха #}
+                                        <span class="badge bg-success px-3 py-2 rounded-pill">
+                                            <i class="bi bi-check-all me-1"></i> Материал изучен
+                                        </span>
+                                    {% else %}
+                                        {# Для тренажеров и практики показываем баллы #}
+                                        <span class="h3 fw-bold text-success">
+                                            {% if hw.hw_type == 'simulator' %}
+                                                {{ hw.score|default:"0" }}%
+                                            {% else %}
+                                                {{ hw.actual_score|default:"0" }} <span class="fs-6 text-muted">/ 10</span>
+                                            {% endif %}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+
+                            <a href="{% url 'homework_view_detail' hw.id %}"
+                               class="btn {% if hw.is_completed %}btn-outline-secondary{% elif hw.status == 'correction' %}btn-warning{% else %}btn-primary shadow-sm{% endif %} px-4 rounded-pill w-100 w-md-auto">
+                                {% if hw.is_completed %}Результаты
+                                {% elif hw.status == 'review' %}Смотреть
+                                {% elif hw.status == 'correction' %}Исправить
+                                {% else %}Начать{% endif %}
+                            </a>
+                        </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 bg-white rounded shadow-sm border border-dashed">
+                    <i class="bi bi-emoji-sunglasses display-1 text-light"></i>
+                    <p class="text-muted mt-3">У тебя пока нет домашних заданий. Отдыхай!</p>
+                </div>
+            {% endif %}
+        </div>
+
+        {# Правая колонка: Учителя #}
+        <div class="col-lg-4 mt-4 mt-lg-0">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-4">Мои учителя</h5>
+                    {% for teacher in teachers %}
+                        <div class="teacher-card p-3 mb-3 border rounded-3 bg-light transition-hover">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="avatar-circle bg-primary text-white me-3 shadow-sm">
+                                    {{ teacher.user.first_name|slice:":1" }}
+                                </div>
+                                <div class="overflow-hidden">
+                                    <h6 class="mb-0 fw-bold text-truncate">{{ teacher.user.get_full_name }}</h6>
+                                    <small class="text-muted d-block text-truncate">
+                                        {% for sub in teacher.subjects.all %}
+                                            {{ sub.name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="small">
+                                <div class="mb-2 d-flex align-items-center">
+                                    <i class="bi bi-envelope-at me-2 text-muted"></i>
+                                    <span class="text-dark text-truncate">{{ teacher.user.email }}</span>
+                                </div>
+
+                                {% with teacher_phone=teacher.user.phones.first %}
+                                    {% if teacher_phone %}
+                                        <div class="mb-2 d-flex align-items-center">
+                                            <i class="bi bi-telephone me-2 text-muted"></i>
+                                            <a href="tel:{{ teacher_phone.number }}" class="text-decoration-none text-dark fw-medium">
+                                                {{ teacher_phone.number }}
+                                            </a>
+                                        </div>
+                                        <a href="https://wa.me/{{ teacher_phone.number|cut:'+'|cut:' '|cut:'-' }}"
+                                           target="_blank" class="btn btn-sm btn-success w-100 mt-2 shadow-sm">
+                                            <i class="bi bi-whatsapp me-2"></i>Написать сообщение
+                                        </a>
+                                    {% else %}
+                                        <div class="text-muted fst-italic small mt-2">Контакт не указан</div>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted text-center py-4">Учителя еще не назначены</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .transition-hover { transition: all 0.3s ease; }
+    .transition-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+    .avatar-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    }
+    .completed-card { border-left: 5px solid #198754 !important; }
+    .border-dashed { border-style: dashed !important; border-width: 2px !important; }
+</style>
+{% endblock %}

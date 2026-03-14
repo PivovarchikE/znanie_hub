@@ -1,73 +1,129 @@
 {% extends "base.html" %}
 {% load static %}
 
-
-{% block hero %}
-<section class="main-banner d-flex align-items-center justify-content-center text-center text-white"
-         style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_main.jpg' %}');">
-
-    <div class="container py-5">
-        <h1 class="display-3 fw-bold mt-5">Знание HUB</h1>
-        <p class="lead mb-4">Твое пространство для учебы и развития</p>
-        <div class="mb-5">
-            {% if not user.is_authenticated %}
-                <a href="{% url 'select_role' %}" class="btn btn-primary btn-lg px-4 me-sm-3">Начать обучение</a>
-                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
-            {% else %}
-                <a href="#about" class="btn btn-outline-light btn-lg px-4">О проекте</a>
-            {% endif %}
-        </div>
-
-        <div class="mt-5 pt-5">
-            <small class="opacity-50">
-                Photo by <a href="https://unsplash.com/@baim" class="text-white text-decoration-none">Baim Hanif</a>
-                on <a href="https://unsplash.com/" class="text-white text-decoration-none">Unsplash</a>
-            </small>
-        </div>
-    </div>
-</section>
-{% endblock hero %}
-
-
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow-sm border-0 p-4">
-                <h3 class="fw-bold mb-4">Новое задание для {{ student.user.full_name }}</h3>
+            <div class="card shadow-sm border-0 p-4 mb-5">
+                <h3 class="fw-bold mb-4 text-primary">
+                    {% if edit_mode %}Редактирование{% else %}Новое задание для {{ student.user.get_full_name }}{% endif %}
+                </h3>
 
-                <form method="post">
+                <form method="post" enctype="multipart/form-data" id="homework-form" novalidate>
                     {% csrf_token %}
+                    <input type="hidden" name="topic" id="id_topic_hidden" value="{{ form.topic.value|default:'' }}">
+                    {{ formset.management_form }}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Предмет</label>
+                        {{ form.subject }}
+                        {% if form.subject.errors %}<div class="text-danger small">{{ form.subject.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Выберите раздел</label>
+                        {{ form.section }}
+                        {% if form.section.errors %}<div class="text-danger small">{{ form.section.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3 d-none" id="accordion_container_wrapper">
+                        <label class="form-label fw-bold">2. Выберите тему из списка</label>
+                        {% if form.topic.errors %}
+                            <div class="text-danger small mb-1">⚠️ Выберите конкретную тему ниже</div>
+                        {% endif %}
+                        <div id="accordion_loader" class="text-center d-none">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                        <div id="topic_accordion_container"
+                         class="border rounded p-3 bg-light {% if form.topic.errors %}border-danger shadow-sm{% endif %}"
+                         style="max-height: 500px; overflow-y: auto;">
+                        {% if form.topic.errors %}
+                            <div class="text-danger fw-bold mb-2 small">
+                                <i class="bi bi-exclamation-circle"></i> Обязательно выберите тему из списка ниже:
+                            </div>
+                        {% endif %}
+                        </div>
+                    </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Тип задания</label>
                         {{ form.hw_type }}
+                        {% if form.hw_type.errors %}<div class="text-danger small">{{ form.hw_type.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-4 p-3 border rounded bg-light d-none" id="theory_toggle_block">
+                        <div class="form-check form-switch">
+                            {{ form.include_site_theory }}
+                            <label class="form-check-label fw-bold">📚 Подключить теорию с сайта</label>
+                        </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Заголовок</label>
                         {{ form.title }}
+                        {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors.0 }}</div>{% endif %}
                     </div>
 
                     <div class="mb-3" id="content_block">
-                        <label class="form-label fw-bold">Текст задания (инструкции/теория)</label>
+                        <label class="form-label fw-bold">Текст задания</label>
                         {{ form.content }}
+                        {% if form.content.errors %}<div class="text-danger small">{{ form.content.errors.0 }}</div>{% endif %}
                     </div>
 
                     <div class="mb-3 d-none" id="simulator_block">
-                        <label class="form-label fw-bold">Выберите конфигурацию тренажера</label>
+                        <label class="form-label fw-bold text-success">⚙️ Конфигурация тренажера</label>
                         {{ form.simulator_config }}
+                        {% if form.simulator_config.errors %}
+                            <div class="text-danger small">⚠️ {{ form.simulator_config.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4 card bg-light p-3" id="files_block">
+                        <label class="form-label fw-bold mb-2">Прикрепить файлы</label>
+                        {% if formset.non_form_errors %}
+                            <div class="text-danger small mb-2">{{ formset.non_form_errors }}</div>
+                        {% endif %}
+                        <div id="file-forms-container">
+                            {% for file_form in formset %}
+                                <div class="file-form-row mb-3 p-2 border rounded bg-white shadow-sm {% if file_form.errors %}border-danger{% endif %}">
+                                    {{ file_form.id }}
+                                    {% if file_form.instance.pk %}
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <span class="text-primary text-truncate">📎 {{ file_form.instance.filename }}</span>
+                                            <div class="delete-wrapper">
+                                                <div style="display:none;">{{ file_form.DELETE }}</div>
+                                                <button type="button" class="btn btn-outline-danger btn-sm border-0" onclick="toggleFileDeletion(this)">🗑️</button>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        {{ file_form.file }}
+                                        {% if file_form.file.errors %}
+                                            <div class="text-danger small mt-1">{{ file_form.file.errors.0 }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-file-btn">+ Добавить еще файл</button>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Дедлайн (необязательно)</label>
+                        <label class="form-label fw-bold">Дедлайн</label>
                         {{ form.deadline }}
+                        {% if form.deadline.errors %}<div class="text-danger small">{{ form.deadline.errors.0 }}</div>{% endif %}
                     </div>
 
-                    <div class="d-flex justify-content-between">
-                        <a href="{% url 'student_detail' student.user.id %}" class="btn btn-light">Отмена</a>
-                        <button type="submit" class="btn btn-primary px-4">Создать задание</button>
+                    <div class="d-flex justify-content-between pt-3 border-top">
+                        <a href="{% url 'student_detail' student.id %}" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary px-5 shadow-sm">Сохранить</button>
                     </div>
                 </form>
             </div>
@@ -75,23 +131,249 @@
     </div>
 </div>
 
-<script>
-    const typeSelect = document.getElementById('id_hw_type');
-    const contentBlock = document.getElementById('content_block');
-    const simulatorBlock = document.getElementById('simulator_block');
+<style>
+    /* Подсветка ошибок */
+    .border-danger { border: 1px solid #dc3545 !important; }
+    .text-danger { font-size: 0.85rem; }
 
-    function toggleFields() {
-        if (typeSelect.value === 'simulator') {
-            contentBlock.classList.add('d-none');
-            simulatorBlock.classList.remove('d-none');
+    .selectable-topic {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        margin-bottom: 4px;
+    }
+    .selectable-topic:hover {
+        background-color: #f0f7ff !important;
+        border-color: #cfe2ff;
+    }
+    .selectable-topic.selected {
+        background-color: #e8f5e9 !important;
+        border: 1px solid #198754 !important;
+        box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.15);
+    }
+
+    .border-danger {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const subjectSelect = document.querySelector('select[name="subject"]') || document.getElementById('id_subject');
+    const sectionSelect = document.querySelector('select[name="section"]') || document.getElementById('id_section');
+    const container = document.getElementById('topic_accordion_container');
+    const wrapper = document.getElementById('accordion_container_wrapper');
+    const loader = document.getElementById('accordion_loader');
+    const hiddenInput = document.getElementById('id_topic_hidden');
+    const typeSelect = document.getElementById('id_hw_type');
+    const titleInput = document.getElementById('id_title');
+
+    if (!subjectSelect) return;
+
+    // УСИЛЕННАЯ ФУНКЦИЯ ОЧИСТКИ ОШИБОК
+    function clearFieldError(element) {
+        if (!element) return;
+
+        // 1. Убираем классы ошибок с самого элемента
+        element.classList.remove('border-danger', 'is-invalid');
+
+        // 2. Находим ближайший контейнер поля (обычно .mb-3)
+        const fieldContainer = element.closest('.mb-3') || element.parentElement;
+
+        // 3. Удаляем все текстовые сообщения об ошибках внутри контейнера
+        const errorMsgs = fieldContainer.querySelectorAll('.text-danger');
+        errorMsgs.forEach(msg => msg.remove());
+
+        // 4. Убираем красную рамку с контейнера, если она там была (для аккордеона)
+        fieldContainer.classList.remove('border-danger');
+    }
+
+    // 1. ПРЕДМЕТ -> РАЗДЕЛЫ
+    subjectSelect.addEventListener('change', function() {
+        clearFieldError(this);
+        const subjectId = this.value;
+        if (!subjectId) {
+            sectionSelect.innerHTML = '<option value="">---------</option>';
+            return;
+        }
+
+        fetch(`{% url 'ajax_get_sections' %}?subject_id=${subjectId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
+            .then(res => res.json())
+            .then(data => {
+                sectionSelect.innerHTML = '<option value="">Выберите раздел</option>';
+                data.forEach(item => {
+                    const option = new Option(item.title, item.id);
+                    sectionSelect.add(option);
+                });
+                if (window._pendingSectionId) {
+                    sectionSelect.value = window._pendingSectionId;
+                    window._pendingSectionId = null;
+                    sectionSelect.dispatchEvent(new Event('change'));
+                }
+            });
+    });
+
+    // 2. РАЗДЕЛ -> АККОРДЕОН
+    sectionSelect?.addEventListener('change', function() {
+        clearFieldError(this);
+        const sectionId = this.value;
+        if (!sectionId) {
+            wrapper.classList.add('d-none');
+            return;
+        }
+
+        wrapper.classList.remove('d-none');
+        loader.classList.remove('d-none');
+        container.innerHTML = '';
+        container.classList.remove('border-danger');
+
+        fetch(`{% url 'ajax_get_accordion' %}?section_id=${sectionId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
+                .then(res => res.text())
+                .then(html => {
+                    loader.classList.add('d-none'); // Исправлено
+                    container.innerHTML = html;
+                    initSelectionLogic();
+
+                    if (window._pendingTopicId) {
+                        const topicEl = container.querySelector(`[data-topic-id="${window._pendingTopicId}"]`);
+                        if (topicEl) {
+                            topicEl.click();
+                            window._pendingTopicId = null;
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error("Ошибка:", err);
+                    loader.classList.add('d-none');
+                });
+    });
+
+    // 3. ЛОГИКА ВЫБОРА ТЕМЫ
+    function initSelectionLogic() {
+        container.querySelectorAll('.selectable-topic').forEach(el => {
+            el.addEventListener('click', function() {
+                container.querySelectorAll('.selectable-topic').forEach(t => {
+                    t.classList.remove('selected');
+                    t.style.background = 'white';
+                });
+                this.classList.add('selected');
+
+                // ПОЛНАЯ ОЧИСТКА ОШИБОК В КАРМАНЕ ТЕМ
+                clearFieldError(container);
+                // Также чистим заголовок "Выберите конкретную тему ниже", если он в wrapper
+                const wrapperErrors = wrapper.querySelectorAll('.text-danger');
+                wrapperErrors.forEach(e => e.remove());
+                wrapper.classList.remove('border-danger');
+
+                const topicId = this.getAttribute('data-topic-id');
+                const topicTitle = this.querySelector('.item-title')?.textContent.trim();
+                const hasTheory = this.getAttribute('data-has-theory') === 'True';
+
+                if (hiddenInput) hiddenInput.value = topicId;
+                if (titleInput && !titleInput.value) {
+                    titleInput.value = topicTitle;
+                    clearFieldError(titleInput);
+                    }
+
+                const theoryBlock = document.getElementById('theory_toggle_block');
+                if (theoryBlock) theoryBlock.classList.toggle('d-none', !hasTheory);
+
+                handleTypeAndConfigs(topicId);
+            });
+        });
+    }
+
+    // 4. ТИП ЗАДАНИЯ И КОНФИГИ
+    function handleTypeAndConfigs(topicId) {
+        const selectedType = typeSelect.value;
+        const simulatorBlock = document.getElementById('simulator_block');
+        const contentBlock = document.getElementById('content_block');
+
+        if (selectedType === 'simulator' || selectedType === 'exam') {
+            if (simulatorBlock) simulatorBlock.classList.remove('d-none');
+            // if (contentBlock) contentBlock.classList.add('d-none'); // скрывает блок текста к тренажеру
+            if (topicId) loadConfigsForTopic(topicId);
         } else {
-            contentBlock.classList.remove('d-none');
-            simulatorBlock.classList.add('d-none');
+            if (simulatorBlock) simulatorBlock.classList.add('d-none');
+            if (contentBlock) contentBlock.classList.remove('d-none');
         }
     }
 
-    typeSelect.addEventListener('change', toggleFields);
-    window.onload = toggleFields; // Проверка при загрузке
-</script>
+    function loadConfigsForTopic(topicId) {
+        const configSelect = document.getElementById('id_simulator_config') || document.querySelector('select[name="simulator_config"]');
+        if (!configSelect) return;
 
+        // Чистим ошибку конфига при выборе
+        configSelect.onchange = () => clearFieldError(configSelect);
+
+        const currentVal = configSelect.value;
+        fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
+            .then(res => res.json())
+            .then(data => {
+                configSelect.innerHTML = '<option value="">---------</option>';
+                data.forEach(c => {
+                    const option = new Option(c.label, c.id);
+                    configSelect.add(option);
+                });
+                if (currentVal) configSelect.value = currentVal;
+            });
+    }
+
+    typeSelect?.addEventListener('change', function() {
+        clearFieldError(this);
+        handleTypeAndConfigs(hiddenInput.value);
+    });
+
+    // Очистка ошибки заголовка при вводе
+    titleInput?.addEventListener('input', function() {
+        if (this.value.trim().length > 0) {
+            clearFieldError(this);
+        }
+    });
+
+    // 5. ВОССТАНОВЛЕНИЕ И СКРОЛЛ
+    const initialSubject = subjectSelect.value;
+    const initialSection = sectionSelect.value;
+    const initialTopic = hiddenInput.value;
+
+    if (initialSubject) {
+        window._pendingSectionId = initialSection;
+        window._pendingTopicId = initialTopic;
+        subjectSelect.dispatchEvent(new Event('change'));
+    }
+    handleTypeAndConfigs(initialTopic);
+
+    setTimeout(() => {
+        const firstErr = document.querySelector('.text-danger, .border-danger, .is-invalid');
+        if (firstErr) {
+            firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 600);
+});
+
+// Глобальная функция для удаления файлов (не менялась)
+function toggleFileDeletion(btn) {
+    const row = btn.closest('.file-form-row');
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        row.style.opacity = checkbox.checked ? '0.3' : '1';
+        row.style.background = checkbox.checked ? '#f8d7da' : '#fff';
+        btn.textContent = checkbox.checked ? '⏪' : '🗑️';
+    }
+}
+</script>
 {% endblock %}

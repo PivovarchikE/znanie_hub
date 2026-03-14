@@ -6,13 +6,13 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Now
 from django.utils.timezone import now
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.validators import RegexValidator
 from django.conf import settings
 
 
 # Запись не удаляется из БД (помечается удаленной через deleted at)
-class SoftDeleteManager(models.Manager):
+class SoftDeleteManager(UserManager):
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
 
@@ -25,7 +25,7 @@ class BaseModel(models.Model):
     # Основной менеджер. Фильтрует данные так, что objects.all доставал только "живые записи"
     objects = SoftDeleteManager()
     # all_objects.all позволяет доставать записи, помеченные как удаленные
-    all_objects = models.Manager()
+    all_objects = UserManager()
 
     # Помечаем, что для BaseModel не надо создавать таблицу в БД
     class Meta:
@@ -35,8 +35,25 @@ class BaseModel(models.Model):
     def delete(self, using=None, keep_parents=False):
         self.deleted_at = now()
         self.save()
-        # Если у модели есть связанные объекты, которые тоже должны "удалиться"
-        # Django не сделает это автоматически при Soft Delete
+
+        # Ручной каскад для связанных объектов, которые поддерживают Soft Delete
+        for related_obj in self._get_related_objects():
+            if hasattr(related_obj, 'delete'):
+                related_obj.delete()
+
+    def _get_related_objects(self):
+        """Вспомогательный метод для поиска всех связанных объектов (Reverse FK)"""
+        for rel in self._meta.related_objects:
+            accessor_name = rel.get_accessor_name()
+            try:
+                # Если это связь OneToOne или ForeignKey
+                related_manager = getattr(self, accessor_name)
+                if hasattr(related_manager, 'all'):
+                    yield from related_manager.all()
+                else:
+                    yield related_manager
+            except Exception:
+                continue
 
     # Восстановление записи
     def restore(self):
@@ -56,6 +73,8 @@ class Role(BaseModel):
 
 class User(AbstractUser, BaseModel):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
+
+    objects = SoftDeleteManager()
 
     def get_role_display(self):
         return self.role
@@ -144,13 +163,11 @@ class StudentProfile(BaseModel):
         blank=False
     )
 
-    teacher = models.ForeignKey(
+    teachers = models.ManyToManyField(
         'TeacherProfile',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
         related_name='my_students',
-        verbose_name="Закрепленный учитель"
+        verbose_name="Учителя",
+        blank=True
     )
 
     def __str__(self):
