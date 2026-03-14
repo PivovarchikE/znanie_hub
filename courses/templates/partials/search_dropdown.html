@@ -1,0 +1,32 @@
+<div class="py-1">
+    {% if results.subjects or results.sections or results.topics or results.simulators %}
+        {% for s in results.subjects %}
+            <a href="{% url 'math_index' %}" class="dropdown-item" hx-boost="false">
+                <strong>📚 Предмет:</strong> {{ s.name }}
+            </a>
+        {% endfor %}
+
+        {% for sec in results.sections %}
+            <a href="{% url 'math_index' %}?section_id={{ sec.id }}#section-tab-{{ sec.id }}"
+               class="dropdown-item"
+               hx-boost="false">
+                <strong>📂 Раздел:</strong> {{ sec.title }}
+            </a>
+        {% endfor %}
+
+        {% for t in results.topics %}
+            <a href="{% url 'topic_detail' t.id %}" class="dropdown-item" hx-boost="false">
+                <strong>📝 Тема:</strong> {{ t.title }} 
+                {% if t.school_class %}<span class="badge bg-light text-dark ms-1">{{ t.school_class.name }}</span>{% endif %}
+            </a>
+        {% endfor %}
+
+        {% for sim in results.simulators %}
+            <a href="{% url 'topic_detail' sim.topic.id %}?config={{ sim.id }}" class="dropdown-item" hx-boost="false">
+                <strong>⚙️ Тренажер:</strong> {{ sim.label }}
+            </a>
+        {% endfor %}
+    {% else %}
+        <div class="p-3 text-center text-muted">Ничего не найдено</div>
+    {% endif %}
+</div>

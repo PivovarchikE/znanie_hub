@@ -2,7 +2,7 @@
 name = "znanie_hub"
 version = "0.1.0"
 description = "Platform for study math, physics and chemistry"
-authors = ["Evgeniy Pivovarchi <eugene.pivovarchik@gmail.com>"]
+authors = ["Evgeniy Pivovarchik <eugene.pivovarchik@gmail.com>"]
 readme = "README.md"
 package-mode = false
 
@@ -14,6 +14,7 @@ python-dotenv = "^1.2.1"
 pillow = "^12.0.0"
 dotenv = "^0.9.9"
 django-bootstrap5 = "^26.1"
+django-htmx = "^1.27.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
@@ -23,6 +24,7 @@ factory-boy = "^3.3.3"
 black = "^25.12.0"
 isort = "^7.0.0"
 flake8 = "^7.3.0"
+freezegun = "^1.5.5"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

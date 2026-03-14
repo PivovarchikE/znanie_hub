@@ -1,0 +1,48 @@
+<div class="recursive-container">
+    {# ТЕМЫ #}
+    <div class="topic-list">
+        {% for topic in current_section.topics.all %}
+        <div class="mb-1">
+            <div class="item-card theme-topic d-flex align-items-center selectable-topic"
+                 data-topic-id="{{ topic.pk }}"
+                 data-has-theory="{{ topic.text_content|yesno:'True,False' }}"
+                 style="cursor: pointer;">
+                <div class="item-icon bg-blue-soft text-blue">
+                    <i class="bi bi-file-earmark-text-fill"></i>
+                </div>
+                <div class="flex-grow-1 item-title">{{ topic.title }}</div>
+                {% if topic.content_type == 'simulator' %}
+                    <span class="badge-pill-bright bg-orange">Тренажер</span>
+                {% endif %}
+                <div class="selection-indicator ms-2 d-none">
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ПОДРАЗДЕЛЫ #}
+    <div class="accordion accordion-flush" id="accordion-select-{{ current_section.id }}">
+        {% for sub in current_section.subsections.all %}
+        <div class="accordion-item border-0 bg-transparent mb-1">
+            <h2 class="accordion-header">
+                <button class="item-card theme-folder accordion-button collapsed shadow-none"
+                        type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapse-select-{{ sub.id }}">
+                    <div class="item-icon bg-purple-soft text-purple">
+                        <i class="bi bi-folder-fill"></i>
+                    </div>
+                    <div class="flex-grow-1 item-title">{{ sub.title }}</div>
+                </button>
+            </h2>
+            <div id="collapse-select-{{ sub.id }}" class="accordion-collapse collapse"
+                 data-bs-parent="#accordion-select-{{ current_section.id }}">
+                <div class="accordion-body p-0 ps-3 pt-1">
+                    {% include "includes/section_recursive_selectable.html" with current_section=sub %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>

@@ -4,30 +4,27 @@
 
 {% block title %}Регистрация: {{ role.name }}{% endblock %}
 
-{% block main_container %}
+{% block content %}
 <div class="container-fluid p-0">
     <div class="row g-0 min-vh-100">
 
         <div class="col-lg-4 d-none d-lg-block shadow-lg">
             <div style="background-image: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)),
-                        url('{% if role.slug == 'student' %}{% static 'images/reg_student_bg.jpg' %}{% else %}{% static 'images/reg_teacher_bg.jpg' %}{% endif %}');
+                        url('{% if role.slug == 'student' %}{% static 'images/reg_student_bg.jpg' %}{% else %}{% static 'images/reg_student_bg.jpg' %}{% endif %}');
                         background-size: cover;
-                        background-position: center;
+                        background-position: 24% center;
                         height: 100%;
                         position: sticky;
                         top: 0;">
 
-                <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white p-5 text-center">
-                    <h1 class="display-4 fw-bold">Znanie HUB</h1>
-                    <p class="lead">Регистрация в роли: <strong>{{ role.name }}</strong></p>
-                    <div class="mt-5 pt-5">
-                        <small class="opacity-50">
-                            Photo by <a
-                                href="https://unsplash.com/@omarvellous14?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Omar
-                            Ramadan</a>
-                            on <a
-                                href="https://unsplash.com/photos/a-white-kitten-sitting-on-top-of-a-white-carpet-L5gVodQ3xTU?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
-
+                <div class="h-100 d-flex flex-column align-items-center justify-content-between text-white p-5 text-center">
+                    <div class="mt-3">
+                        <h1 class="display-6 fw-bold">Регистрация: <strong>{{ role.name }}</strong></h1>
+                    </div>
+                    <div class="mb-3">
+                        <small class="opacity-20">
+                            Photo by <a href="https://unsplash.com/@szamanm?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Piotr Musioł</a>
+                            on <a href="https://unsplash.com/photos/white-cat-on-brown-dried-leaves-QzeTuBFsMxQ?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
                         </small>
 
                     </div>
@@ -82,8 +79,7 @@
 
                                     {% if role.slug == 'student' %}
                                     <div class="col-md-3">
-                                        <label class="form-label fw-bold small mb-1">{{ form.relationship.label
-                                            }}</label>
+                                        <label class="form-label fw-bold small mb-1">{{ form.relationship.label }}</label>
                                         {{ form.relationship }}
                                     </div>
                                     <div class="col-md-3">
@@ -93,8 +89,7 @@
                                     {% endif %}
 
                                     <div class="col-md-3 d-flex align-self-end pb-2">
-                                        <div class="form-check me-3 mb-0" style="min-width: 100px;"> {{ form.is_primary
-                                            }}
+                                        <div class="form-check me-3 mb-0" style="min-width: 100px;"> {{ form.is_primary }}
                                             <label class="form-check-label small"
                                                    for="{{ form.is_primary.id_for_label }}">
                                                 Основной
@@ -208,6 +203,6 @@
     });
 </script>
 
-{% endblock main_container %}
+{% endblock content %}
 
 

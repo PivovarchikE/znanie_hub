@@ -134,6 +134,22 @@ django = ">=4.2"
 jinja = ["jinja2 (>=3.0,<4)"]
 
 [[package]]
+name = "django-htmx"
+version = "1.27.0"
+description = "Extensions for using Django with htmx."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "django_htmx-1.27.0-py3-none-any.whl", hash = "sha256:13e1e13b87d39b57f95aae6e4987cb3df056d0b1373a41f4a94504a00298ffd8"},
+    {file = "django_htmx-1.27.0.tar.gz", hash = "sha256:036e5da801bfdf5f1ca815f21592cfb9f004a898f330c842f15e55c70e301a75"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=4.2"
+
+[[package]]
 name = "dotenv"
 version = "0.9.9"
 description = "Deprecated package"
@@ -200,6 +216,21 @@ files = [
 mccabe = ">=0.7.0,<0.8.0"
 pycodestyle = ">=2.14.0,<2.15.0"
 pyflakes = ">=3.4.0,<3.5.0"
+
+[[package]]
+name = "freezegun"
+version = "1.5.5"
+description = "Let your Python tests travel through time"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "freezegun-1.5.5-py3-none-any.whl", hash = "sha256:cd557f4a75cf074e84bc374249b9dd491eaeacd61376b9eb3c423282211619d2"},
+    {file = "freezegun-1.5.5.tar.gz", hash = "sha256:ac7742a6cc6c25a2c35e9292dfd554b897b517d2dec26891a2e8debf205cb94a"},
+]
+
+[package.dependencies]
+python-dateutil = ">=2.7"
 
 [[package]]
 name = "inflection"
@@ -614,6 +645,21 @@ pytest = ">=7.0"
 typing_extensions = "*"
 
 [[package]]
+name = "python-dateutil"
+version = "2.9.0.post0"
+description = "Extensions to the standard Python datetime module"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+groups = ["dev"]
+files = [
+    {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
+    {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
+]
+
+[package.dependencies]
+six = ">=1.5"
+
+[[package]]
 name = "python-dotenv"
 version = "1.2.1"
 description = "Read key-value pairs from a .env file and set them as environment variables"
@@ -684,6 +730,18 @@ files = [
 dev = ["black", "build", "mypy", "pytest", "pytest-cov", "setuptools", "tox", "twine", "wheel"]
 
 [[package]]
+name = "six"
+version = "1.17.0"
+description = "Python 2 and 3 compatibility utilities"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+groups = ["dev"]
+files = [
+    {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
+    {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
+]
+
+[[package]]
 name = "sqlparse"
 version = "0.5.5"
 description = "A non-validating SQL parser."
@@ -727,4 +785,4 @@ markers = {main = "sys_platform == \"win32\"", dev = "platform_system == \"Windo
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "057bb1baceaefa16c53e2ae95be746d4f2a7713012a33c68510356ae1a95607d"
+content-hash = "039df5ada21db35220aa97ce63e88b34c812154708189f2cb39ede2be5d86a6e"

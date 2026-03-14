@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+
+{% block content %}
+
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Мои ученики</a></li>
+            <li class="breadcrumb-item active">{{ student.user.full_name }}</li>
+        </ol>
+    </nav>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-bold mb-1">{{ student.user.full_name }}</h2>
+                <p class="text-muted mb-0">
+                    {{ student.school_class.number }} класс |
+                    Предметы: {% for s in student.subjects.all %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </p>
+            </div>
+             <div>
+                <a href="{% url 'edit_student' student.id %}" class="btn btn-outline-primary btn-sm">Редактировать</a>
+
+                <form action="{% url 'delete_student' student.id %}" method="post"
+                      style="display: inline;"
+                      onsubmit="return confirm('Вы уверены, что хотите удалить ученика? Все его данные будут скрыты.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="fw-bold mb-3">Контакты ученика</h5>
+
+        <div class="d-flex align-items-center mb-3">
+            <i class="bi bi-envelope text-primary me-3"></i>
+            <div>
+                <div class="text-muted small">Email</div>
+                <div>{{ student.user.email|default:"Не указан" }}</div>
+            </div>
+        </div>
+
+        <hr class="my-3 opacity-25">
+
+        <div class="text-muted small mb-2">Телефоны</div>
+        {% for phone in student.user.phones.all %}
+            <div class="d-flex align-items-center mb-2">
+                <i class="bi bi-telephone text-success me-3"></i>
+                <div>
+                    <div class="fw-bold">
+                        <a href="tel:{{ phone.number }}" class="text-decoration-none text-dark">
+                            {{ phone.number }}
+                        </a>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.8rem;">
+                        {{ phone.get_relationship_display }}, {{ phone.owner_name }}
+                    </div>
+                </div>
+                <a href="https://wa.me/{{ phone.number|cut:'+'|cut:' '|cut:'-' }}"
+                   target="_blank" class="ms-auto btn btn-sm btn-outline-success border-0">
+                    <i class="bi bi-whatsapp"></i>
+                </a>
+            </div>
+        {% empty %}
+            <p class="text-muted small">Номера телефонов не добавлены</p>
+        {% endfor %}
+    </div>
+</div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Домашние задания</h4>
+        <a href="{% url 'add_homework' student.id %}" class="btn btn-primary btn-sm">+ Добавить ДЗ</a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Дата задания</th>
+                        <th>Предмет</th>
+                        <th>Тип</th>
+                        <th>Задание</th>
+                        <th>Срок</th>
+                        <th>Статус / Результат</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hw in homeworks %}
+                    <tr>
+                        <td class="text-nowrap">
+                            {{ hw.created_at|date:"d.m.Y H:i"|default:"—" }}
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ hw.subject.name }}</span>
+                        </td>
+                        <td>
+                            <span class="badge {% if hw.hw_type == 'simulator' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ hw.get_hw_type_display }}
+                            </span>
+                        </td>
+                        <td><strong>{{ hw.title }}</strong></td>
+                        <td class="text-nowrap">{{ hw.deadline|date:"d.m.Y H:i"|default:"—" }}</td>
+                        <td>
+                            {% if hw.is_completed %}
+                                {# ЗАВЕРШЕННЫЕ ЗАДАНИЯ #}
+                                <span class="text-success fw-bold">
+                                    <i class="bi bi-check-square-fill"></i>
+                                    {% if hw.hw_type == 'simulator' %}
+                                        {{ hw.score }}%
+                                    {% elif hw.hw_type == 'practice' %}
+                                        {{ hw.actual_score|default:"10" }}/10
+                                    {% else %}
+                                        Изучено
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                {# ЗАДАНИЯ В ПРОЦЕССЕ #}
+                                {% if hw.status == 'review' %}
+                                    <span class="badge bg-info text-dark">
+                                        <i class="bi bi-eye-fill"></i> На проверке
+                                    </span>
+                                {% elif hw.status == 'correction' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> На доработке
+                                    </span>
+                                {% else %}
+                                    {# Статус pending или если status еще не заполнен #}
+                                    <span class="text-muted text-nowrap">
+                                        <i class="bi bi-clock-history"></i>
+                                        {% if hw.hw_type == 'simulator' %}Не выполнено{% else %}Не прочитано{% endif %}
+                                    </span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <div class="d-flex justify-content-end align-items-center">
+                                {# 1. Детализация (график) #}
+                                {% if hw.hw_type == 'simulator' and hw.is_completed %}
+                                    <button class="btn btn-link text-info p-0 me-2"
+                                            onclick="showHwDetails('{{ hw.id }}')"
+                                            title="Посмотреть детализацию">
+                                        <i class="bi bi-bar-chart-line"></i>
+                                    </button>
+                                {% endif %}
+
+                                {# 2. Редактировать #}
+                                {% if not hw.is_completed %}
+                                    <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 me-2" title="Редактировать"><i class="bi bi-pencil-square"></i></a>
+                                {% endif %}
+
+                                {# 3. Просмотр #}
+                                <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 me-2" title="Просмотр"><i class="bi bi-eye"></i></a>
+
+                                {# 4. Удаление (форма) #}
+                                <form action="{% url 'delete_homework' hw.id %}" method="post"
+                                      onsubmit="return confirm('Вы уверены, что хотите удалить это задание?');"
+                                      class="d-inline p-0 m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-link text-danger p-0" title="Удалить">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">Заданий пока нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="teacherDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold">Результаты: <span id="modalHwTitle" class="text-primary"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Пример</th>
+                                <th>Ответ ученика</th>
+                                <th>Правильный</th>
+                                <th class="text-center">Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacherDetailsBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showHwDetails(hwId) {
+    const body = document.getElementById('teacherDetailsBody');
+    const title = document.getElementById('modalHwTitle');
+
+    // Очистка и лоадер
+    body.innerHTML = '<tr><td colspan="4" class="text-center py-3">Загрузка данных...</td></tr>';
+
+    // Показываем модалку сразу
+    const modal = new bootstrap.Modal(document.getElementById('teacherDetailsModal'));
+    modal.show();
+
+    // Запрос к API (используем ранее созданный URL)
+    fetch(`/api/homework-results/${hwId}/`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
+        .then(response => {
+            if (!response.ok) throw new Error('Данные не найдены');
+            return response.json();
+        })
+        .then(data => {
+            title.innerText = data.title;
+            body.innerHTML = '';
+
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(res => {
+                    const row = `
+                        <tr>
+                            <td class="fw-bold">${res.q}</td>
+                            <td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">
+                                ${res.user_a}
+                            </td>
+                            <td><span class="badge bg-secondary">${res.correct_a}</span></td>
+                            <td class="text-center">${res.is_correct ? '✅' : '❌'}</td>
+                        </tr>
+                    `;
+                    body.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Нет данных о сессии</td></tr>';
+            }
+        })
+            .catch(err => {
+                console.error("Debug info:", err);
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-danger py-4">
+                            <i class="bi bi-exclamation-triangle"></i> Результаты еще не синхронизированы.<br>
+                            <small class="text-muted">Проверьте, завершил ли ученик сессию корректно.</small>
+                        </td>
+                    </tr>`;
+            });
+}
+</script>
+
+{% endblock %}

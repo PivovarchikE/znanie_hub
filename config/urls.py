@@ -14,21 +14,24 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-
+from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.views.generic import TemplateView
 
+from config import settings
 from courses import views as courses_views
 from users import views as users_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('', courses_views.index, name='index'),
-
-    # registration
-    path('select-role/', users_views.select_role, name='select_role'),
-    # <slug:role_slug> — это "ловушка", которая поймает любое слово после /register/
-    path('register/<slug:role_slug>/', users_views.dynamic_register_view, name='dynamic_register'),
-    path('login/', users_views.login_view, name='login'),
-    path('logout/', users_views.logout_view, name='logout'),
+    path('', TemplateView.as_view(template_name='index.html'), name='index'),
+    path('thanks/', TemplateView.as_view(template_name='thanks.html'), name='thanks'),
+    path('', include('courses.urls')),
+    path('', include('users.urls')),
+    path('projects/', include('other_pages.urls')),
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
