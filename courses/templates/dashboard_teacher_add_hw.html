@@ -198,7 +198,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        fetch(`{% url 'ajax_get_sections' %}?subject_id=${subjectId}`)
+        fetch(`{% url 'ajax_get_sections' %}?subject_id=${subjectId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
             .then(res => res.json())
             .then(data => {
                 sectionSelect.innerHTML = '<option value="">Выберите раздел</option>';
@@ -228,7 +232,11 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = '';
         container.classList.remove('border-danger');
 
-        fetch(`{% url 'ajax_get_accordion' %}?section_id=${sectionId}`)
+        fetch(`{% url 'ajax_get_accordion' %}?section_id=${sectionId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
                 .then(res => res.text())
                 .then(html => {
                     loader.classList.add('d-none'); // Исправлено
@@ -292,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (selectedType === 'simulator' || selectedType === 'exam') {
             if (simulatorBlock) simulatorBlock.classList.remove('d-none');
-            if (contentBlock) contentBlock.classList.add('d-none');
+            // if (contentBlock) contentBlock.classList.add('d-none'); // скрывает блок текста к тренажеру
             if (topicId) loadConfigsForTopic(topicId);
         } else {
             if (simulatorBlock) simulatorBlock.classList.add('d-none');
@@ -308,7 +316,11 @@ document.addEventListener('DOMContentLoaded', function() {
         configSelect.onchange = () => clearFieldError(configSelect);
 
         const currentVal = configSelect.value;
-        fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`)
+        fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, {
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+})
             .then(res => res.json())
             .then(data => {
                 configSelect.innerHTML = '<option value="">---------</option>';

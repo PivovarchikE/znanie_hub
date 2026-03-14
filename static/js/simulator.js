@@ -115,7 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRFToken': CONFIG_DATA.csrfToken
+                            'X-CSRFToken': CONFIG_DATA.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
                         },
                         body: JSON.stringify({
                             homework_id: CONFIG_DATA.assignmentId,
@@ -272,7 +273,7 @@ function renderDetailedTable() {
         if (CONFIG_DATA.isAuthenticated) {
             await fetch('/save_training_result/', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken},
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
                 body: JSON.stringify({
                     config_id: currentConfigId,
                     homework_id: CONFIG_DATA.assignmentId,
