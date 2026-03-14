@@ -261,12 +261,12 @@ html {
 
 /* Специфика для папки (подраздела) */
 .theme-folder {
-    background-color: #fdfaff !important; /* Очень легкий фиолетовый */
-    border-color: #e9d8fd !important;
+    background-color: #fdfaff; /* Очень легкий фиолетовый */
+    border-color: #e9d8fd;
 }
 .theme-folder:not(.collapsed) {
-    background-color: #faf5ff !important;
-    border-color: #d6bcfa !important;
+    background-color: #faf5ff;
+    border-color: #d6bcfa;
 }
 
 /* Иконки */
@@ -338,4 +338,217 @@ html {
 }
 .animate__fadeIn {
     animation-name: fadeIn;
+}
+
+/* Стиль выпадашки на base.html */
+#search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 150%;
+    min-width: 350px;
+    max-height: 450px;
+    overflow-y: auto;
+    z-index: 9999 !important;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    display: none;
+    margin-top: 5px;
+}
+
+/* Стили для элементов списка */
+.dropdown-item {
+    white-space: normal;
+    padding: 10px 15px;
+    border-bottom: 1px solid #f1f1f1;
+    display: block;
+    color: #333;
+    transition: background 0.2s;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item strong {
+    color: #0d6efd; /* Выделяем категорию синим цветом */
+}
+
+/* Стили для навигации клавиатурой */
+.dropdown-item.active-result {
+    background-color: #e9ecef; /* Цвет подсветки */
+    color: #0d6efd;
+    outline: none;
+}
+
+/* На мобильных устройствах или узких экранах вернем ширину 100% */
+@media (max-width: 768px) {
+    #search-results {
+        width: 100%;
+    }
+}
+
+/* Подсветка найденных элементов */
+/* Анимация для контейнера: облако + масштаб */
+@keyframes highlightPulseContainer {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 249, 196, 0); }
+    30% { transform: scale(1.03); box-shadow: 0 0 30px 10px rgba(255, 249, 196, 0.9); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 249, 196, 0); }
+}
+
+/* Анимация для внутренней заливки: пробиваем фоны */
+@keyframes highlightPulseFill {
+    0% { background-color: transparent; }
+    30% { background-color: #fff9c4 !important; }
+    100% { background-color: transparent; }
+}
+
+/* Применяем к обертке (accordion-item) */
+.search-highlight {
+    animation: highlightPulseContainer 2s ease-out !important;
+    z-index: 1000 !important;
+    position: relative;
+    border-radius: 10px;
+}
+
+/* Применяем к кнопкам и карточкам внутри */
+.search-highlight .accordion-button,
+.search-highlight .item-card,
+.search-highlight .theme-topic,
+.search-highlight .theme-folder {
+    animation: highlightPulseFill 2s ease-out !important;
+    /* Убираем синий фон Bootstrap при открытии, чтобы видеть желтый */
+    --bs-accordion-active-bg: #fff9c4 !important;
+    border-color: #f6e05e !important;
+}
+
+/* Фикс для активной кнопки аккордеона */
+.search-highlight .accordion-button:not(.collapsed) {
+    background-color: #fff9c4 !important;
+    color: #2d3748 !important;
+}
+
+/* --- ОБЩИЕ СТИЛИ (МОБИЛЬНАЯ ВЕРСИЯ) --- */
+.header-logo {
+    height: 40px;
+    width: auto;
+    transition: height 0.3s ease;
+}
+
+.auth-buttons-container {
+    display: flex;
+    gap: 8px;
+}
+
+/* Стили мобильного меню */
+.mobile-menu-container {
+    background: #fff;
+    border-top: 1px solid #eee;
+}
+
+.mobile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 15px;
+}
+
+.mobile-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #333;
+    gap: 8px; /* Раздвигаем иконку и текст */
+}
+
+.mobile-item img { width: 32px; height: 32px; }
+.mobile-item span { font-size: 0.9rem; font-weight: 600; }
+
+/* --- ДЕСКТОПНАЯ ВЕРСИЯ (ОТ 1200px) --- */
+@media (min-width: 1200px) {
+    .header-side-left,
+    .header-side-right {
+        flex: 1 0 0%;
+    }
+
+    .header-logo {
+        height: 60px !important; /* Оптимальный размер для десктопа */
+    }
+
+    /* Главные ссылки */
+    .main-nav-links .nav-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px; /* Раздвигаем иконку и текст в главном меню */
+        padding: 10px 0;
+    }
+
+    .main-nav-links .nav-link img {
+        width: 32px !important; /* 41px было слишком много, 32px — стандарт */
+        height: 32px !important;
+    }
+
+    .main-nav-links .nav-link span {
+        font-size: 0.85rem !important;
+        font-weight: 500;
+    }
+
+    /* Поиск */
+    .search-input-desktop {
+        height: 35px !important;
+        width: 240px !important;
+        border-radius: 20px;
+    }
+
+    /* Жесткое скрытие мобильных блоков */
+    #navbarContent.collapse.navbar-collapse,
+    #mobileSearch.collapse {
+        display: none !important;
+    }
+}
+
+/* --- ВЫРАВНИВАНИЕ --- */
+.header-center {
+    flex: 0 0 auto;
+}
+
+/* Фикс для кнопок: чтобы текст не переносился */
+.btn {
+    white-space: nowrap;
+}
+
+/* Гарантия скрытия на мобилках до нажатия */
+@media (max-width: 1199px) {
+    #navbarContent.collapse:not(.show),
+    #mobileSearch.collapse:not(.show) {
+        display: none !important;
+    }
+}
+
+.mobile-menu-container .btn-light {
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+}
+
+/* Выделяем аватарку в хедере, чтобы она была заметнее */
+.header-side-right img.rounded-circle:hover {
+    border-color: #0d6efd !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+}
+
+/* Стили подробного отчета тренажера */
+.table-success-light { background-color: rgba(25, 135, 84, 0.05); }
+.table-danger-light { background-color: rgba(220, 53, 69, 0.05); }
+
+#detailedResults {
+    transition: all 0.3s ease;
 }

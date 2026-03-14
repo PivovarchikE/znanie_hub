@@ -115,7 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRFToken': CONFIG_DATA.csrfToken
+                            'X-CSRFToken': CONFIG_DATA.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
                         },
                         body: JSON.stringify({
                             homework_id: CONFIG_DATA.assignmentId,
@@ -205,6 +206,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
+    // --- ЛОГИКА МОДАЛЬНОГО ОКНА (РЕЗУЛЬТАТЫ) ---
+const showDetailsBtn = document.getElementById('showDetailsBtn');
+const detailedResults = document.getElementById('detailedResults');
+const detailsTableBody = document.getElementById('detailsTableBody');
+
+if (showDetailsBtn) {
+    showDetailsBtn.addEventListener('click', function() {
+        // Переключаем видимость блока с таблицей
+        detailedResults.classList.toggle('d-none');
+
+        // Меняем текст кнопки в зависимости от состояния
+        if (detailedResults.classList.contains('d-none')) {
+            this.innerText = 'Подробнее';
+        } else {
+            this.innerText = 'Скрыть детали';
+            renderDetailedTable(); // Отрисовываем таблицу
+        }
+    });
+}
+
+function renderDetailedTable() {
+    if (!detailsTableBody) return;
+
+    // Очищаем таблицу перед заполнением
+    detailsTableBody.innerHTML = '';
+
+    results.forEach((res, index) => {
+        const row = document.createElement('tr');
+        // Добавляем класс подсветки строки (зеленый/красный)
+        row.className = res.is_correct ? 'table-success-light' : 'table-danger-light';
+
+        row.innerHTML = `
+            <td class="fw-medium">${res.q}</td>
+            <td class="${res.is_correct ? 'text-success' : 'text-danger'} fw-bold">${res.user_a}</td>
+            <td><span class="badge bg-success">${res.correct_a}</span></td>
+            <td class="text-center">
+                ${res.is_correct ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle-fill text-danger"></i>'}
+            </td>
+        `;
+        detailsTableBody.appendChild(row);
+    });
+}
+
     // События тренажера
     if (CONFIG_DATA.presetConfigId) initWorkout(CONFIG_DATA.presetConfigId);
     document.querySelectorAll('.config-select-btn').forEach(btn => {
@@ -229,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (CONFIG_DATA.isAuthenticated) {
             await fetch('/save_training_result/', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken},
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
                 body: JSON.stringify({
                     config_id: currentConfigId,
                     homework_id: CONFIG_DATA.assignmentId,

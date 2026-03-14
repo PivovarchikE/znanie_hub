@@ -5,7 +5,7 @@ from django.db import models
 from users.models import User, BaseModel, SchoolClass, StudentProfile, TeacherProfile
 
 
-class Subject(models.Model):
+class Subject(BaseModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Название")
 
     class Meta:
@@ -64,7 +64,7 @@ class Topic(BaseModel):
         return self.title
 
 
-class SimulatorConfig(models.Model):
+class SimulatorConfig(BaseModel):
     """Настройки конкретного тренажера (например, 'до 20', 'до 100') или самостоятельной работы"""
     CONFIG_TYPE_CHOICES = [
         ('practice', 'Тренажер (случайные задания)'),
@@ -80,7 +80,7 @@ class SimulatorConfig(models.Model):
         return f"{self.get_config_type_display()} ({self.label})"
 
 
-class TrainingSession(models.Model):
+class TrainingSession(BaseModel):
     """Результат прохождения тренажера"""
     student = models.ForeignKey(User, on_delete=models.CASCADE)
     config = models.ForeignKey(SimulatorConfig, on_delete=models.PROTECT)
@@ -180,7 +180,7 @@ class HomeworkFile(BaseModel):
         return self.original_name or self.file.name
 
 
-class HomeworkResponseFile(models.Model):
+class HomeworkResponseFile(BaseModel):
     homework = models.ForeignKey(Homework, on_delete=models.CASCADE, related_name='responses')
     file = models.ImageField("Фото решения", upload_to='responses/%Y/%m/%d/')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -189,7 +189,7 @@ class HomeworkResponseFile(models.Model):
         return f"Файл для задания {self.homework.id}"
 
 
-class HomeworkComment(models.Model):
+class HomeworkComment(BaseModel):
     homework = models.ForeignKey(Homework, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField()
