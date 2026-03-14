@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 
 import pytest
 
@@ -79,9 +80,13 @@ def homework(student_user, teacher_user, subject, topic, simulator_config):
     )
 
 
-@pytest.fixture(autouse=True)
-def cleanup_media():
-    yield
-    # Логика удаления папки после завершения теста
-    if os.path.exists(settings.MEDIA_ROOT):
-        shutil.rmtree(settings.MEDIA_ROOT)
+@pytest.fixture(scope='session', autouse=True)
+def temp_media(request):
+    """Создает временную папку media для тестов и удаляет её после них"""
+    settings.MEDIA_ROOT = tempfile.mkdtemp(prefix='pytest_media_')
+
+    def cleanup():
+        if os.path.exists(settings.MEDIA_ROOT):
+            shutil.rmtree(settings.MEDIA_ROOT)
+
+    request.addfinalizer(cleanup)
