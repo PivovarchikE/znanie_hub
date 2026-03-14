@@ -1,0 +1,54 @@
+/* Подсветка текста "Основной" при ошибке */
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.fw-bold {
+    font-weight: 700 !important;
+}
+
+/* Рамка вокруг чекбокса или его контейнера */
+.form-check.is-invalid-container {
+    border: 1px solid #dc3545;
+    padding: 5px;
+    border-radius: 4px;
+    background-color: #fff8f8;
+}
+
+/* Красивая тряска при появлении ошибки */
+.error-shake {
+    animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+/* Убираем стандартные отступы Django у формы as_p, если нужно */
+form p {
+    margin-bottom: 1rem;
+}
+
+form input {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+
+form input:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+

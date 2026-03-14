@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="display-5 fw-bold">Добро пожаловать!</h1>
+        <p class="lead">Выберите ваш профиль для регистрации в системе</p>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-5">
+            <div class="card h-100 shadow-sm border-primary text-center p-4">
+                <div class="card-body">
+                    <div class="mb-3"><i class="bi bi-book fs-1 text-primary"></i></div>
+                    <h3 class="card-title">Ученик</h3>
+                    <p class="card-text text-muted">Доступ к курсам, домашним заданиям и статистике обучения.</p>
+                    <a href="{% url 'dynamic_register' role_slug='student' %}" class="btn btn-outline-primary btn-lg w-100 mt-3">
+                        Выбрать
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card h-100 shadow-sm border-success text-center p-4">
+                <div class="card-body">
+                    <div class="mb-3"><i class="bi bi-person-badge fs-1 text-success"></i></div>
+                    <h3 class="card-title">Учитель</h3>
+                    <p class="card-text text-muted">Создание контента, проверка работ и управление группами.</p>
+                    <a href="{% url 'dynamic_register' role_slug='teacher' %}" class="btn btn-outline-success btn-lg w-100 mt-3">
+                        Выбрать
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,554 @@
+.main-banner {
+    /* Высота баннера: 60% от высоты экрана. Можно поставить 400px или 500px */
+    min-height: 60vh;
+
+    /* Важнейшие настройки фона */
+    background-size: cover;       /* Картинка заполнит весь блок без искажений */
+    background-position: center;   /* Центрируем картинку */
+    background-repeat: no-repeat;
+
+    /* Дополнительно: центрируем текст внутри баннера */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;    /* Текст ссылки будет внизу */
+    padding: 20px;
+}
+
+/* Ссылка автора на фоне картинки */
+.main-banner a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 0.8rem;
+}
+
+/* Плавная прокрутка для всей страницы */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Настройки баннера (если еще не добавил) */
+.main-banner {
+    min-height: 60vh;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Стиль для блока "О проекте" */
+.about-section {
+    padding: 80px 0;
+    background-color: #f8f9fa; /* Светло-серый фон для контраста */
+}
+
+
+/* Гарантируем, что поля ввода видны и занимают место */
+.phone-form-row input[type="text"],
+.phone-form-row input[type="tel"],
+.phone-form-row select {
+    display: block !important;
+    width: 100% !important;
+    height: 38px !important; /* Высота как у кнопок Bootstrap */
+    visibility: visible !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* Выравниваем чекбокс и его текст в одну линию */
+.phone-form-row .form-check {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Отступ между квадратиком и словом "Основной" */
+}
+
+.phone-form-row .form-check-input {
+    margin-top: 0; /* Убираем смещение вниз */
+    flex-shrink: 0; /* Чтобы чекбокс не сжимался */
+}
+
+.phone-form-row .form-check-label {
+    white-space: nowrap; /* Запрещаем перенос текста "Основной" */
+}
+
+/* Кнопка удаления в рамке */
+.remove-phone-btn {
+    border-radius: 4px;
+    line-height: 1;
+    font-weight: bold;
+    min-width: 32px;
+}
+
+
+/* 1. Стили для ВСЕХ табов (и неактивных, и тех, что стали неактивными) */
+.nav-tabs .nav-link {
+    color: #7b68ee !important;       /* Фиолетовый по умолчанию */
+    font-weight: normal !important;   /* Обычный шрифт по умолчанию */
+    background-color: transparent !important;
+    border: 1px solid transparent !important;
+    transition: all 0.3s ease;
+}
+
+/* 2. Стили строго для АКТИВНОГО таба */
+.nav-tabs .nav-link.active {
+    color: #6c757d !important;        /* Серый только когда активен */
+    font-weight: bold !important;     /* Жирный только когда активен */
+    background-color: #fff !important;
+    border-color: #dee2e6 #dee2e6 #fff !important;
+    border-radius: 5px 5px 0 0;
+}
+
+/* 3. Ховер только для неактивных */
+.nav-tabs .nav-link:hover:not(.active) {
+    color: #5a4dbb !important;
+    border-color: #eee #eee transparent !important;
+}
+
+/* Контейнер списка тем */
+.custom-list {
+    list-style: none; /* Убираем стандартные маркеры */
+    padding-left: 0;  /* Сбрасываем внутренний отступ контейнера */
+    margin-top: 20px;
+}
+
+/* Элемент списка (тема) */
+.custom-list li {
+    position: relative;
+    padding-left: 30px;      /* Отступ текста от левого края (где будет точка) */
+    margin-bottom: 20px;     /* Тот самый отступ МЕЖДУ темами */
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #6c757d;          /* Серый цвет текста */
+}
+
+/* Кастомный буллит (точка) */
+.custom-list li::before {
+    content: "•";            /* Символ точки */
+    color: #adb5bd;          /* Светло-серый цвет точки */
+    position: absolute;
+    left: 5px;               /* Положение точки относительно края */
+    top: -2px;               /* Небольшая корректировка по вертикали */
+    font-size: 1.5rem;       /* Размер самой точки */
+    line-height: 1;
+}
+
+/* Опционально: убираем отступ у последнего элемента */
+.custom-list li:last-child {
+    margin-bottom: 0;
+}
+
+/* Подсветка названия темы при наведении */
+.topic-title:hover {
+    color: #7b68ee;
+    transition: color 0.2s ease;
+}
+
+/* Чтобы описание не наезжало на точку-буллит */
+.custom-list li div.small {
+    margin-top: 4px;
+    line-height: 1.2;
+}
+
+/* --- Стили для оформления теоретического материала --- */
+
+.theory-section {
+    font-family: 'Inter', -apple-system, sans-serif; /* Или твой основной шрифт */
+    color: #333;
+}
+
+/* Заголовки разделов внутри теории */
+.theory-content h3 {
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 10px;
+}
+
+/* Декоративная полоска под заголовком */
+.theory-content h3::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 3px;
+    background: currentColor; /* Цвет возьмется из text-primary или text-danger */
+    border-radius: 2px;
+}
+
+/* Стили для карточек с формулами (alert блоки) */
+.theory-content .alert {
+    font-size: 1.1rem;
+    padding: 1.25rem;
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* Стили для блоков с примерами (bg-light) */
+.theory-content .bg-light {
+    border-left-width: 5px !important;
+    border-radius: 8px;
+    padding: 20px !important;
+    font-size: 1rem;
+}
+
+/* Списки внутри теории */
+.theory-content ol, .theory-content ul {
+    margin-bottom: 1.5rem;
+    padding-left: 1.2rem;
+}
+
+.theory-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* Выделение сильных сторон/правил */
+.theory-content strong {
+    color: #212529;
+}
+
+/* Адаптивность: на маленьких экранах уменьшаем шрифты */
+@media (max-width: 768px) {
+    .theory-content h3 {
+        font-size: 1.25rem;
+    }
+    .theory-content p {
+        font-size: 0.95rem;
+    }
+}
+
+.completed-card {
+    background-color: #f8f9fa !important;
+    border-left: 6px solid #198754 !important;
+    opacity: 0.9;
+}
+
+.transition-hover {
+    transition: all 0.3s ease;
+}
+
+.transition-hover:hover {
+    transform: translateX(5px); /* Слегка сдвигается вправо при наведении */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* Общая база для карточек тем и подразделов */
+.item-card {
+    display: flex;
+    width: 100%;
+    padding: 10px 14px; /* Уменьшенные отступы */
+    border-radius: 10px;
+    text-decoration: none !important;
+    color: #2d3748;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+/* Специфика для темы */
+.theme-topic {
+    background-color: #ffffff;
+    border-color: #edf2f7;
+}
+.theme-topic:hover {
+    background-color: #f0f7ff;
+    border-color: #bee3f8;
+    transform: translateX(3px);
+}
+
+/* Специфика для папки (подраздела) */
+.theme-folder {
+    background-color: #fdfaff; /* Очень легкий фиолетовый */
+    border-color: #e9d8fd;
+}
+.theme-folder:not(.collapsed) {
+    background-color: #faf5ff;
+    border-color: #d6bcfa;
+}
+
+/* Иконки */
+.item-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+/* Цвета иконок */
+.bg-blue-soft { background-color: #ebf8ff; }
+.text-blue { color: #3182ce; }
+
+.bg-purple-soft { background-color: #faf5ff; }
+.text-purple { color: #805ad5; }
+
+/* Бейджики */
+.badge-pill-bright {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: white;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.bg-orange { background-color: #ed8936; }
+
+.badge-count {
+    font-size: 0.75rem;
+    color: #a0aec0;
+    margin-right: 8px;
+}
+
+/* Убираем стандартную стрелку Bootstrap, чтобы она не мешала нашей иконке */
+.accordion-button::after {
+    display: none;
+}
+.item-arrow {
+    font-size: 0.8rem;
+    opacity: 0.4;
+}
+
+/* Линия вложенности */
+.accordion-body {
+    border-left: 2px solid #e2e8f0;
+    margin-left: 16px;
+}
+
+.theory-slide {
+    animation-duration: 0.5s;
+}
+.transition-all {
+    transition: all 0.4s ease-in-out;
+}
+.animate__animated {
+    animation-fill-mode: both;
+}
+
+/* Эффект появления */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate__fadeIn {
+    animation-name: fadeIn;
+}
+
+/* Стиль выпадашки на base.html */
+#search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 150%;
+    min-width: 350px;
+    max-height: 450px;
+    overflow-y: auto;
+    z-index: 9999 !important;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    display: none;
+    margin-top: 5px;
+}
+
+/* Стили для элементов списка */
+.dropdown-item {
+    white-space: normal;
+    padding: 10px 15px;
+    border-bottom: 1px solid #f1f1f1;
+    display: block;
+    color: #333;
+    transition: background 0.2s;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item strong {
+    color: #0d6efd; /* Выделяем категорию синим цветом */
+}
+
+/* Стили для навигации клавиатурой */
+.dropdown-item.active-result {
+    background-color: #e9ecef; /* Цвет подсветки */
+    color: #0d6efd;
+    outline: none;
+}
+
+/* На мобильных устройствах или узких экранах вернем ширину 100% */
+@media (max-width: 768px) {
+    #search-results {
+        width: 100%;
+    }
+}
+
+/* Подсветка найденных элементов */
+/* Анимация для контейнера: облако + масштаб */
+@keyframes highlightPulseContainer {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 249, 196, 0); }
+    30% { transform: scale(1.03); box-shadow: 0 0 30px 10px rgba(255, 249, 196, 0.9); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 249, 196, 0); }
+}
+
+/* Анимация для внутренней заливки: пробиваем фоны */
+@keyframes highlightPulseFill {
+    0% { background-color: transparent; }
+    30% { background-color: #fff9c4 !important; }
+    100% { background-color: transparent; }
+}
+
+/* Применяем к обертке (accordion-item) */
+.search-highlight {
+    animation: highlightPulseContainer 2s ease-out !important;
+    z-index: 1000 !important;
+    position: relative;
+    border-radius: 10px;
+}
+
+/* Применяем к кнопкам и карточкам внутри */
+.search-highlight .accordion-button,
+.search-highlight .item-card,
+.search-highlight .theme-topic,
+.search-highlight .theme-folder {
+    animation: highlightPulseFill 2s ease-out !important;
+    /* Убираем синий фон Bootstrap при открытии, чтобы видеть желтый */
+    --bs-accordion-active-bg: #fff9c4 !important;
+    border-color: #f6e05e !important;
+}
+
+/* Фикс для активной кнопки аккордеона */
+.search-highlight .accordion-button:not(.collapsed) {
+    background-color: #fff9c4 !important;
+    color: #2d3748 !important;
+}
+
+/* --- ОБЩИЕ СТИЛИ (МОБИЛЬНАЯ ВЕРСИЯ) --- */
+.header-logo {
+    height: 40px;
+    width: auto;
+    transition: height 0.3s ease;
+}
+
+.auth-buttons-container {
+    display: flex;
+    gap: 8px;
+}
+
+/* Стили мобильного меню */
+.mobile-menu-container {
+    background: #fff;
+    border-top: 1px solid #eee;
+}
+
+.mobile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 15px;
+}
+
+.mobile-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #333;
+    gap: 8px; /* Раздвигаем иконку и текст */
+}
+
+.mobile-item img { width: 32px; height: 32px; }
+.mobile-item span { font-size: 0.9rem; font-weight: 600; }
+
+/* --- ДЕСКТОПНАЯ ВЕРСИЯ (ОТ 1200px) --- */
+@media (min-width: 1200px) {
+    .header-side-left,
+    .header-side-right {
+        flex: 1 0 0%;
+    }
+
+    .header-logo {
+        height: 60px !important; /* Оптимальный размер для десктопа */
+    }
+
+    /* Главные ссылки */
+    .main-nav-links .nav-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px; /* Раздвигаем иконку и текст в главном меню */
+        padding: 10px 0;
+    }
+
+    .main-nav-links .nav-link img {
+        width: 32px !important; /* 41px было слишком много, 32px — стандарт */
+        height: 32px !important;
+    }
+
+    .main-nav-links .nav-link span {
+        font-size: 0.85rem !important;
+        font-weight: 500;
+    }
+
+    /* Поиск */
+    .search-input-desktop {
+        height: 35px !important;
+        width: 240px !important;
+        border-radius: 20px;
+    }
+
+    /* Жесткое скрытие мобильных блоков */
+    #navbarContent.collapse.navbar-collapse,
+    #mobileSearch.collapse {
+        display: none !important;
+    }
+}
+
+/* --- ВЫРАВНИВАНИЕ --- */
+.header-center {
+    flex: 0 0 auto;
+}
+
+/* Фикс для кнопок: чтобы текст не переносился */
+.btn {
+    white-space: nowrap;
+}
+
+/* Гарантия скрытия на мобилках до нажатия */
+@media (max-width: 1199px) {
+    #navbarContent.collapse:not(.show),
+    #mobileSearch.collapse:not(.show) {
+        display: none !important;
+    }
+}
+
+.mobile-menu-container .btn-light {
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+}
+
+/* Выделяем аватарку в хедере, чтобы она была заметнее */
+.header-side-right img.rounded-circle:hover {
+    border-color: #0d6efd !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+}
+
+/* Стили подробного отчета тренажера */
+.table-success-light { background-color: rgba(25, 135, 84, 0.05); }
+.table-danger-light { background-color: rgba(220, 53, 69, 0.05); }
+
+#detailedResults {
+    transition: all 0.3s ease;
+}

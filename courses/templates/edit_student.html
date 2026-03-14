@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Дашборд</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'student_detail' student.id %}">{{ student.user.get_full_name }}</a></li>
+                    <li class="breadcrumb-item active">Редактирование</li>
+                </ol>
+            </nav>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h4 class="fw-bold mb-0">Редактирование данных ученика</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" id="edit-student-form">
+                        {% csrf_token %}
+
+                        <h5 class="text-muted mb-3 border-bottom pb-2">Личные данные</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Имя</label>
+                                {{ user_form.first_name }}
+                                {{ user_form.first_name.errors }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Фамилия</label>
+                                {{ user_form.last_name }}
+                                {{ user_form.last_name.errors }}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Email</label>
+                                {{ user_form.email }}
+                                {{ user_form.email.errors }}
+                            </div>
+                        </div>
+
+                        <h5 class="text-muted mb-3 border-bottom pb-2">Учебная информация</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Класс</label>
+                                {{ profile_form.school_class }}
+                                {{ profile_form.school_class.errors }}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Предметы</label>
+                                <div class="p-3 border rounded {% if profile_form.subjects.errors %}border-danger bg-light{% endif %}">
+                                    {{ profile_form.subjects }}
+                                </div>
+                                {% if profile_form.subjects.errors %}
+                                    {% for error in profile_form.subjects.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <strong>⚠️ {{ error }}</strong>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+
+                        {% if phone_formset.non_form_errors %}
+                            <div class="alert alert-danger shadow-sm mb-3">
+                                <ul class="mb-0">
+                                    {% for error in phone_formset.non_form_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 mt-4">
+                            <h5 class="m-0 text-muted">Контактные телефоны</h5>
+                            <button type="button" class="btn btn-sm btn-success" id="add-phone-btn">
+                                + Добавить номер
+                            </button>
+                        </div>
+
+                        {{ phone_formset.management_form }}
+
+                        <div id="phone-formset-container">
+                            {% for form in phone_formset %}
+                            <div class="phone-form-row card mb-3 bg-light border-0 shadow-sm">
+                                <div class="card-body">
+                                    <div class="row g-3 align-items-center">
+                                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold small mb-1">Номер</label>
+                                            {{ form.number }}
+                                            {% if form.number.errors %}
+                                                <div class="text-danger small mt-1">{{ form.number.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold small mb-1">Чей номер</label>
+                                            {{ form.relationship }}
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold small mb-1">Владелец</label>
+                                            {{ form.owner_name }}
+                                        </div>
+
+                                        <div class="col-md-3 d-flex align-self-end pb-2">
+                                            <div class="form-check me-2 mb-0">
+                                                {{ form.is_primary }}
+                                                <label class="form-check-label small" for="{{ form.is_primary.id_for_label }}">
+                                                    Осн.
+                                                </label>
+                                            </div>
+
+                                            <div style="display: none;">{{ form.DELETE }}</div>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm remove-phone-btn border-1 px-2 py-1 ms-auto"
+                                                    title="Удалить">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-flex justify-content-between border-top pt-4 mt-4">
+                            <a href="{% url 'student_detail' student.id %}" class="btn btn-light">Отмена</a>
+                            <button type="submit" class="btn btn-primary px-5 shadow-sm">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/inputmask@5.0.8/dist/inputmask.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+    console.log("JS для редактирования инициализирован");
+
+    const container = document.getElementById('phone-formset-container');
+    const addButton = document.getElementById('add-phone-btn');
+    const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
+    const MAX_FORMS = 5;
+
+    if (!container || !addButton || !totalForms) {
+        console.error("Не найдены элементы формы!", {container, addButton, totalForms});
+        return;
+    }
+
+    // 1. Функция применения маски к номеру
+    function applyMask(row) {
+        const input = row.querySelector('input[name$="-number"]');
+        if (input) {
+            Inputmask("+375-99-999-99-99").mask(input);
+        }
+    }
+
+    // 2. Функция управления кнопкой "+"
+    function toggleAddButton() {
+        // Считаем только видимые строки (те, что не помечены на удаление)
+        const visibleRows = container.querySelectorAll('.phone-form-row:not([style*="display: none"])').length;
+        if (visibleRows >= MAX_FORMS) {
+            addButton.style.display = 'none';
+        } else {
+            addButton.style.display = 'inline-block';
+        }
+    }
+
+    // Применяем маску ко всем полям при загрузке
+    document.querySelectorAll('.phone-form-row').forEach(applyMask);
+    toggleAddButton();
+
+    // 3. Добавление новой формы
+    addButton.addEventListener('click', function() {
+        const allRows = container.querySelectorAll('.phone-form-row');
+        const currentIndex = parseInt(totalForms.value);
+
+        if (currentIndex >= MAX_FORMS) {
+            alert("Максимальное количество номеров: " + MAX_FORMS);
+            return;
+        }
+
+        // Клонируем самую первую строку как шаблон
+        const newRow = allRows[0].cloneNode(true);
+
+        // Очищаем данные и обновляем индексы (0 -> currentIndex)
+        const idRegex = new RegExp(`-\\d+-`, 'g');
+        newRow.querySelectorAll('input, select, label').forEach(el => {
+            // Обновляем атрибуты name, id и for
+            ['name', 'id', 'for'].forEach(attr => {
+                if (el.hasAttribute(attr)) {
+                    el.setAttribute(attr, el.getAttribute(attr).replace(idRegex, `-${currentIndex}-`));
+                }
+            });
+
+            // Очищаем значения
+            if (el.tagName === 'INPUT') {
+                if (el.type === 'checkbox') {
+                    el.checked = false;
+                } else {
+                    el.value = '';
+                }
+            }
+        });
+
+        // Скрытое поле ID для новой строки должно быть пустым
+        const idInput = newRow.querySelector('input[name$="-id"]');
+        if (idInput) idInput.value = '';
+
+        // Чекбокс удаления должен быть снят, а сама строка видима
+        const deleteCheck = newRow.querySelector('input[name$="-DELETE"]');
+        if (deleteCheck) deleteCheck.checked = false;
+        newRow.style.display = 'block';
+
+        container.appendChild(newRow);
+
+        // Увеличиваем общий счетчик форм для Django
+        totalForms.value = currentIndex + 1;
+
+        applyMask(newRow);
+        toggleAddButton();
+    });
+
+    // 4. Удаление формы (Делегирование события)
+    container.addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.remove-phone-btn');
+        if (!removeBtn) return;
+
+        const row = removeBtn.closest('.phone-form-row');
+        const idInput = row.querySelector('input[name$="-id"]');
+        const deleteCheckbox = row.querySelector('input[name$="-DELETE"]');
+        const visibleRows = container.querySelectorAll('.phone-form-row:not([style*="display: none"])');
+
+        // Проверка: нельзя удалить последний видимый номер
+        if (visibleRows.length <= 1) {
+            alert("Минимум один номер телефона обязателен");
+            return;
+        }
+
+        if (idInput && idInput.value) {
+            // Если номер уже есть в базе (есть ID):
+            // Помечаем скрытый чекбокс DELETE и скрываем строку визуально
+            if (deleteCheckbox) {
+                deleteCheckbox.checked = true;
+                row.style.display = 'none';
+                console.log("Строка помечена на удаление в БД");
+            }
+        } else {
+            // Если это новая строка (еще не в базе):
+            // Просто удаляем её из DOM и уменьшаем TOTAL_FORMS
+            row.remove();
+            totalForms.value = container.querySelectorAll('.phone-form-row').length;
+            console.log("Новая строка удалена из DOM");
+
+            // Важно: после удаления из DOM нужно пересчитать индексы оставшихся НОВЫХ форм,
+            // но для простоты Django обычно прощает пропуски в индексах,
+            // если TOTAL_FORMS корректен.
+        }
+
+        toggleAddButton();
+    });
+});
+</script>
+{% endblock %}

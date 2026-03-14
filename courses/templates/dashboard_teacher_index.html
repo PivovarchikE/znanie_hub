@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block hero %}
+<section class="main-banner d-flex align-items-end justify-content-end text-center text-white"
+         style="
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{% static 'images/hero_math_main.jpg' %}');
+            background-size: cover;
+            background-position: center 60%;
+            min-height: 500px;
+        ">
+
+    <div class="p-3">
+        <small class="opacity-50">
+            Photo by <a
+                href="https://unsplash.com/@mccarthybeckan?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">McCarthy
+            Beckan</a>
+            on <a
+                href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+        </small>
+    </div>
+    </div>
+</section>
+{% endblock hero %}
+
+
+{% block content %}
+
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Мои ученики</h2>
+        <a href="{% url 'dynamic_register' 'student' %}" class="btn btn-success shadow-sm">
+            + Добавить ученика
+        </a>
+    </div>
+
+
+    <div class="card border-0 shadow-sm">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Ученик</th>
+                    <th>Класс</th>
+                    <th class="text-center">Чат</th>
+                    <th class="text-center">Инфо</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>
+                        <div class="fw-bold">{{ student.user.full_name }}</div>
+                        <div class="small text-muted">@{{ student.user.username }}</div>
+                    </td>
+                    <td>{{ student.school_class.number }} класс</td>
+                    <td class="text-center">
+                        <a href="#" class="btn btn-link position-relative">
+                            {% if student.has_unread %}
+                                <i class="bi bi-chat-dots-fill text-primary fs-4"></i> <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                            {% else %}
+                                <i class="bi bi-chat-left text-secondary fs-4"></i> {% endif %}
+                        </a>
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'student_detail' student.id %}" class="btn btn-outline-secondary btn-sm">
+                             🔍 Детали
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center py-5 text-muted">У вас пока нет учеников</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
