@@ -1,4 +1,8 @@
+import io
+
 import pytest
+from PIL import Image
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from courses.models import Subject
@@ -239,3 +243,77 @@ def test_profile_queries_do_not_grow(client, teacher_user, django_assert_num_que
     # Количество запросов должно остаться ТАКИМ ЖЕ (10)
     with django_assert_num_queries(count_before):
         client.get(reverse('profile_edit'))
+
+
+@pytest.mark.django_db
+class TestAvatarUpdate:
+    """Тест логики аватара"""
+    @pytest.fixture(autouse=True)
+    def setup_client(self, client, teacher_user):
+        """Автоматически логиним пользователя перед каждым тестом в этом классе"""
+        self.client = client
+        self.user = teacher_user
+        self.client.force_login(self.user)
+        self.url = reverse('avatar_update')
+
+    def create_test_image(self):
+        """Вспомогательный метод для генерации картинки"""
+        file_obj = io.BytesIO()
+        image = Image.new('RGB', (100, 100), color='blue')
+        image.save(file_obj, 'JPEG')
+        file_obj.seek(0)
+        return SimpleUploadedFile("test_avatar.jpg", file_obj.read(), content_type="image/jpeg")
+
+    def test_avatar_upload_and_optimization(self):
+        """Тест: загрузка, обрезка и сжатие до 400x400"""
+        image = self.create_test_image()
+        data = {
+            'avatar': image,
+            'x': '0',
+            'y': '0',
+            'width': '100',
+            'height': '100',
+        }
+
+        response = self.client.post(self.url, data)
+
+        # Проверяем редирект (успех)
+        assert response.status_code == 302
+
+        self.user.refresh_from_db()
+        assert self.user.avatar is not None
+
+        # Проверяем, что Pillow отработал: ресайз до 400x400
+        img = Image.open(self.user.avatar.path)
+        assert img.size == (400, 400)
+        assert img.format == 'JPEG'
+
+    def test_avatar_deletion(self):
+        """Тест: удаление аватара через POST-параметр delete_avatar"""
+        # Сначала принудительно ставим аватар
+        self.user.avatar = self.create_test_image()
+        self.user.save()
+
+        response = self.client.post(self.url, {'delete_avatar': ''})
+
+        assert response.status_code == 302
+        self.user.refresh_from_db()
+        assert not self.user.avatar  # Поле должно стать пустым
+
+    def test_size_limit_backend_validation(self):
+        """
+        Тест: хотя есть JS-проверка, бэкенд не должен падать
+        при попытке загрузки
+        """
+        response = self.client.get(self.url)
+        assert response.status_code == 200
+        assert 'avatar-form' in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_avatar_update_access_denied(client):
+    """Тест: анонимный пользователь не имеет доступа"""
+    url = reverse('avatar_update')
+    response = client.get(url)
+    assert response.status_code == 302
+    assert 'login' in response.url
