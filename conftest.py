@@ -83,10 +83,17 @@ def homework(student_user, teacher_user, subject, topic, simulator_config):
 @pytest.fixture(scope='session', autouse=True)
 def temp_media(request):
     """Создает временную папку media для тестов и удаляет её после них"""
-    settings.MEDIA_ROOT = tempfile.mkdtemp(prefix='pytest_media_')
+    # Создаем временную директорию
+    temp_dir = tempfile.mkdtemp(prefix='pytest_media_')
+
+    # Сохраняем оригинальный путь, чтобы потом (теоретически) вернуть
+    from django.conf import settings as django_settings
+    original_media_root = django_settings.MEDIA_ROOT
+    django_settings.MEDIA_ROOT = temp_dir
 
     def cleanup():
-        if os.path.exists(settings.MEDIA_ROOT):
-            shutil.rmtree(settings.MEDIA_ROOT)
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        django_settings.MEDIA_ROOT = original_media_root
 
     request.addfinalizer(cleanup)

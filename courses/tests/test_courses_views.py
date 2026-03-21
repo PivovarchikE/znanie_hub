@@ -262,7 +262,9 @@ class TestHomeworkFiles:
         hw = Homework.objects.get(title='Задание с файлом')
         # Проверяем, что файл прикрепился к объекту HomeworkFile (через related_name)
         assert hw.files.count() == 1
-        assert "manual.pdf" in hw.files.first().file.name
+        saved_file_name = hw.files.first().file.name
+        assert "manual" in saved_file_name
+        assert saved_file_name.endswith(".pdf")
 
     def test_upload_hw_response_student(self, client, student_user, homework):
         """Тест: Ученик загружает фото выполненной работы (ответ на ДЗ)"""

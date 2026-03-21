@@ -615,7 +615,6 @@ def student_dashboard_view(request):
     })
 
 
-@login_required
 @require_GET
 def global_search_view(request):
     query = request.GET.get('q', '').strip()
