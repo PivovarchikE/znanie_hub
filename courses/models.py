@@ -173,8 +173,14 @@ class HomeworkFile(BaseModel):
     file = models.FileField("Файл", upload_to='homeworks/%Y/%m/%d/')
     original_name = models.CharField(max_length=255, blank=True)
 
+    @property
     def filename(self):
-        return os.path.basename(self.file.name)
+        """Возвращает оригинальное имя или имя файла из пути"""
+        if self.original_name:
+            return self.original_name
+        if self.file:
+            return os.path.basename(self.file.name)
+        return "Файл без названия"
 
     def __str__(self):
         return self.original_name or self.file.name

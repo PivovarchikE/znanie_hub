@@ -322,11 +322,11 @@ def add_homework_view(request, student_id):
     )
 
     if request.method == 'POST':
-        # Логируем входящие данные (без чувствительной инфы, если нужно)
+        # Логируем входящие данные (без чувствительной инфы)
         logger.info(f"Processing HW submission: Teacher={request.user.id}, Student={student.user.id}")
 
         form = HomeworkForm(request.POST)
-        formset = HomeworkFileFormSet(request.POST, request.FILES)
+        formset = HomeworkFileFormSet(request.POST, request.FILES, prefix='files')
 
         if form.is_valid() and formset.is_valid():
             try:
@@ -365,7 +365,7 @@ def add_homework_view(request, student_id):
 
     else:
         form = HomeworkForm()
-        formset = HomeworkFileFormSet()
+        formset = HomeworkFileFormSet(prefix='files')
 
     return render(request, 'dashboard_teacher_add_hw.html', {
         'form': form,
@@ -402,7 +402,7 @@ def edit_homework_view(request, hw_id):
 
     if request.method == 'POST':
         form = HomeworkForm(request.POST, instance=homework)
-        formset = HomeworkFileFormSet(request.POST, request.FILES, instance=homework)
+        formset = HomeworkFileFormSet(request.POST, request.FILES, instance=homework, prefix='files')
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 form.save()
@@ -467,12 +467,17 @@ def grade_homework(request, hw_id):
             )
 
         if action == 'accept':
+            if not score:
+                messages.error(request, "Необходимо выставить балл для принятия работы.")
+                return redirect('...')
             homework.status = 'completed'
             homework.is_completed = True
             homework.actual_score = score
         elif action == 'reject':
             homework.status = 'correction'
             homework.is_completed = False
+            if score:
+                homework.actual_score = score
 
         homework.save()
     return redirect('homework_view_detail', hw_id=hw_id)
