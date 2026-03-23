@@ -4,13 +4,14 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.3.2/luminous-basic.min.css">
 
 <style>
-    .img-thumbnail { transition: transform 0.2s; cursor: zoom-in; }
+    .img-thumbnail { transition: transform 0.2s; cursor: zoom-in; border-radius: 8px; }
     .img-thumbnail:hover { transform: scale(1.02); }
     .border-dashed { border: 2px dashed #dee2e6; border-radius: 10px; }
-    /* Стили для чата */
-    .chat-bubble { max-width: 85%; font-size: 0.9rem; border-radius: 15px !important; }
-    .chat-teacher { bg-primary text-white; border-bottom-left-radius: 2px !important; }
-    .chat-student { bg-white text-dark; border-bottom-right-radius: 2px !important; }
+
+    .chat-bubble { max-width: 85%; font-size: 0.9rem; border-radius: 15px !important; padding: 10px 15px; }
+    /* Исправленные стили вместо Bootstrap-классов */
+    .chat-teacher { background-color: #0d6efd; color: white; border-bottom-left-radius: 2px !important; }
+    .chat-student { background-color: #f8f9fa; color: #212529; border: 1px solid #dee2e6; border-bottom-right-radius: 2px !important; }
 </style>
 
 <div class="container mt-4">
@@ -49,7 +50,7 @@
                         {# Кнопка заблокирована (визуально), если задание выполнено #}
                         <button class="btn btn-outline-secondary btn-sm" disabled title="Нельзя редактировать выполненное задание">
                             <i class="bi bi-pencil"></i> Редактировать
-                        </button>-
+                        </button>
                     {% endif %}
                 {% else %}
                     <a href="{% url 'student_dashboard' %}" class="btn btn-light btn-sm">← К моим заданиям</a>
@@ -210,12 +211,23 @@
                                             <textarea name="teacher_comment" class="form-control form-control-sm mb-3" rows="3" placeholder="Что исправить?"></textarea>
                                             <label class="small text-muted">Балл (0-10):</label>
                                             <div class="input-group input-group-sm mb-3">
-                                                <input type="number" name="actual_score" class="form-control" min="0" max="10" value="{{ homework.actual_score|default:'' }}" required>
+                                                <input type="number" name="actual_score" class="form-control" min="0" max="10" value="{{ homework.actual_score|default:'' }}">
                                                 <span class="input-group-text">/ 10</span>
                                             </div>
                                             <div class="d-grid gap-2">
-                                                <button type="submit" name="action" value="accept" class="btn btn-success btn-sm">Принять</button>
-                                                <button type="submit" name="action" value="reject" class="btn btn-warning btn-sm">На доработку</button>
+                                                <button type="submit" name="action" value="accept" class="btn btn-success btn-sm">
+                                                    Принять
+                                                </button>
+
+                                                {% if homework.status != 'correction' %}
+                                                    <button type="submit" name="action" value="reject" class="btn btn-warning btn-sm">
+                                                        На доработку
+                                                    </button>
+                                                {% else %}
+                                                    <div class="badge bg-light text-warning border border-warning py-2">
+                                                        ⚠️ Ожидаем исправления от ученика
+                                                    </div>
+                                                {% endif %}
                                             </div>
                                         </form>
                                     {% endif %}
@@ -263,56 +275,125 @@
 </div>
 
 {# --- СКРИПТЫ --- #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.3.2/luminous.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Результаты симулятора
+    // Данные из Django
     const hwId = "{{ homework.id }}";
-    if ("{{ homework.is_completed }}" === "True" && "{{ homework.hw_type }}" === "simulator") {
+    const isCompleted = "{{ homework.is_completed }}" === "True";
+    const hwType = "{{ homework.hw_type }}";
+
+    // 1. Результаты симулятора (только если ДЗ завершено и это симулятор)
+    if (isCompleted && hwType === "simulator") {
         const body = document.getElementById('studentDetailsBody');
-        fetch(`/api/homework-results/${hwId}/`, {
-    headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-    }
-})
+        if (body) {
+            fetch(`/api/homework-results/${hwId}/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
             .then(res => res.json())
             .then(data => {
-                body.innerHTML = '';
-                data.results.forEach(res => {
-                    body.insertAdjacentHTML('beforeend', `<tr><td class="fw-bold">${res.q}</td><td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">${res.user_a}</td><td><span class="badge bg-secondary">${res.correct_a}</span></td><td class="text-center">${res.is_correct ? '✅' : '❌'}</td></tr>`);
-                });
-            }).catch(() => body.innerHTML = '<tr><td colspan="4" class="text-center">Ошибка загрузки</td></tr>');
+                if (data.results) {
+                    body.innerHTML = '';
+                    data.results.forEach(res => {
+                        body.insertAdjacentHTML('beforeend', `
+                            <tr>
+                                <td class="fw-bold">${res.q}</td>
+                                <td class="${res.is_correct ? 'text-success' : 'text-danger fw-bold'}">${res.user_a}</td>
+                                <td><span class="badge bg-secondary">${res.correct_a}</span></td>
+                                <td class="text-center">${res.is_correct ? '✅' : '❌'}</td>
+                            </tr>`);
+                    });
+                }
+            })
+            .catch(() => { body.innerHTML = '<tr><td colspan="4" class="text-center">Ошибка загрузки</td></tr>'; });
+        }
     }
 
-    // 2. Фото и превью
+    // 2. Фото и превью (Логика выбора файлов учеником)
     const photoInput = document.getElementById('photoInput');
     const saveBtn = document.getElementById('savePhotosBtn');
     const preview = document.getElementById('photoPreview');
     const uploadForm = document.getElementById('uploadForm');
 
-    photoInput?.addEventListener('change', function() {
-        preview.innerHTML = '';
-        let valid = true;
-        Array.from(this.files).forEach(file => {
-            const size = file.size / (1024 * 1024);
-            const wrapper = document.createElement('div'); wrapper.className = 'position-relative';
-            const img = document.createElement('img'); img.className = 'img-thumbnail'; img.style = 'width: 100px; height: 100px; object-fit: cover;';
-            if (size > 10) { valid = false; img.style.border = '3px solid red'; }
-            const reader = new FileReader(); reader.onload = (e) => img.src = e.target.result; reader.readAsDataURL(file);
-            wrapper.appendChild(img); preview.appendChild(wrapper);
+    if (photoInput) {
+        photoInput.addEventListener('change', function() {
+            preview.innerHTML = '';
+            let valid = true;
+
+            Array.from(this.files).forEach(file => {
+                const size = file.size / (1024 * 1024);
+                const wrapper = document.createElement('div');
+                wrapper.className = 'position-relative';
+
+                const img = document.createElement('img');
+                img.className = 'img-thumbnail';
+                img.style = 'width: 100px; height: 100px; object-fit: cover; margin-right: 5px;';
+
+                // Валидация размера (10МБ)
+                if (size > 10) {
+                    valid = false;
+                    img.style.border = '3px solid red';
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => img.src = e.target.result;
+                reader.readAsDataURL(file);
+
+                wrapper.appendChild(img);
+                preview.appendChild(wrapper);
+            });
+
+            if (saveBtn) {
+                saveBtn.classList.toggle('d-none', !valid || this.files.length === 0);
+            }
         });
-        saveBtn.classList.toggle('d-none', !valid || this.files.length === 0);
-    });
+    }
 
-    uploadForm?.addEventListener('submit', () => { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; });
+    if (uploadForm && saveBtn) {
+        uploadForm.addEventListener('submit', () => {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Загрузка...';
+        });
+    }
 
-    // 3. Галерея Luminous
-    const script = document.createElement('script');
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.3.2/Luminous.min.js";
-    script.onload = () => {
-        const items = document.querySelectorAll('.luminous');
-        if (items.length) new LuminousGallery(items);
-    };
-    document.head.appendChild(script);
+    // 3. Галерея Luminous (Исправлено закрытие скобок)
+    const luminousItems = document.querySelectorAll('.luminous');
+    if (luminousItems.length > 0 && typeof LuminousGallery !== 'undefined') {
+        new LuminousGallery(luminousItems, {}, {
+            closeOnBottomClick: true,
+            showCloseButton: true
+        });
+
+        // Блокируем стандартный переход по ссылке
+        luminousItems.forEach(el => {
+            el.addEventListener('click', e => e.preventDefault());
+        });
+    }
 });
 </script>
+
+<script>
+document.getElementById('grade-hw-form').addEventListener('submit', function(e) {
+    const action = e.submitter.value; // Получаем значение 'accept' или 'reject'
+    const scoreInput = document.getElementById('id_actual_score');
+
+    // Если нажата кнопка "Принять", оценка обязательна
+    if (action === 'accept') {
+        if (!scoreInput.value || scoreInput.value.trim() === '') {
+            e.preventDefault(); // Останавливаем отправку
+            scoreInput.classList.add('is-invalid'); // Подсвечиваем красным (Bootstrap)
+            alert('Для принятия работы необходимо выставить балл.');
+            scoreInput.focus();
+        }
+    }
+    // Если "На доработку", форма отправится даже с пустым баллом
+});
+
+// Убираем красную рамку, когда учитель начинает вводить балл
+document.getElementById('id_actual_score').addEventListener('input', function() {
+    this.classList.remove('is-invalid');
+});
+</script>
+
 {% endblock %}

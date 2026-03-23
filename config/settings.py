@@ -29,8 +29,39 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
 
-ALLOWED_HOSTS = []
-# CSRF_TRUSTED_ORIGINS = []
+# Разрешаем хост туннеля
+ALLOWED_HOSTS = [
+    'biggest-indicate-ink-robertson.trycloudflare.com',  # Твой текущий адрес
+    'localhost',
+    '127.0.0.1',
+    '.trycloudflare.com',  # Разрешаем любые поддомены Cloudflare для тестов
+]
+
+# settings.py
+
+# Доверяем заголовкам Cloudflare
+# Cloudflare передает протокол через этот заголовок
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+# Настройки кук для HTTPS (Cloudflare всегда дает HTTPS)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax' # 'Lax' стабильнее для Cloudflare, чем 'None'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Доверительные источники (заменить на новый домен позже)
+# Пока добавим маску для Cloudflare
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.trycloudflare.com',
+    'https://biggest-indicate-ink-robertson.trycloudflare.com'
+]
+
+# Длительность сессии (2 недели)
+SESSION_COOKIE_AGE = 1209600
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
 
 # Application definition
 
