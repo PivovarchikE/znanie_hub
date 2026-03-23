@@ -1,6 +1,24 @@
+from django.core.exceptions import ValidationError
 from django.forms import ModelForm, inlineformset_factory, Select, TextInput, Textarea, DateTimeInput, FileInput, \
     CheckboxInput
 from .models import Homework, HomeworkFile, SimulatorConfig, Section, Topic
+
+
+class HomeworkFileForm(ModelForm):
+    class Meta:
+        model = HomeworkFile
+        fields = ['file']
+        widgets = {
+            'file': FileInput(attrs={'class': 'form-control'})
+        }
+
+    def clean_file(self):
+        file = self.cleaned_data.get('file')
+        if file:
+            # Ограничение 10 МБ (10 * 1024 * 1024 байт)
+            if file.size > 10 * 1024 * 1024:
+                raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        return file
 
 
 class HomeworkForm(ModelForm):
@@ -60,8 +78,10 @@ class HomeworkForm(ModelForm):
 HomeworkFileFormSet = inlineformset_factory(
     Homework,
     HomeworkFile,
-    fields=('file',),
+    form=HomeworkFileForm,
     extra=1,
+    max_num=10,
+    validate_max=True,
     can_delete=True,
     widgets={'file': FileInput(attrs={'class': 'form-control'})}
 )
