@@ -31,9 +31,11 @@ DEBUG = os.getenv("DEBUG") == "True"
 
 # Разрешаем хост туннеля
 ALLOWED_HOSTS = [
-    'biggest-indicate-ink-robertson.trycloudflare.com',  # Твой текущий адрес
+    'biggest-indicate-ink-robertson.trycloudflare.com',
+    'znanie-hub.instatunnel.my',
     'localhost',
     '127.0.0.1',
+
     '.trycloudflare.com',  # Разрешаем любые поддомены Cloudflare для тестов
 ]
 
@@ -48,14 +50,15 @@ USE_X_FORWARDED_PORT = True
 # Настройки кук для HTTPS (Cloudflare всегда дает HTTPS)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = 'Lax' # 'Lax' стабильнее для Cloudflare, чем 'None'
-CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'None' # 'Lax' стабильнее для Cloudflare, чем 'None'
+CSRF_COOKIE_SAMESITE = 'None' # 'Lax' стабильнее для Cloudflare, чем 'None'
 
 # Доверительные источники (заменить на новый домен позже)
 # Пока добавим маску для Cloudflare
 CSRF_TRUSTED_ORIGINS = [
     'https://*.trycloudflare.com',
-    'https://biggest-indicate-ink-robertson.trycloudflare.com'
+    'https://biggest-indicate-ink-robertson.trycloudflare.com',
+    'https://znanie-hub.instatunnel.my'
 ]
 
 # Длительность сессии (2 недели)

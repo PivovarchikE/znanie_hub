@@ -3,6 +3,7 @@ import sys
 
 from django.contrib import messages
 from django.contrib.postgres.search import SearchVector
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
@@ -379,12 +380,17 @@ def add_homework_view(request, student_id):
 @require_http_methods(['GET', 'POST'])
 def homework_view_detail(request, hw_id):
     homework = get_object_or_404(
-        Homework.objects.select_related(
+        Homework.objects.filter(
+            Q(student__user=request.user) | Q(teacher__user=request.user)
+        ).select_related(
+            'student__user',
+            'teacher__user',
+            'topic',
             'subject',
             'section',
-            'topic',
-            'simulator_config',
-            'student__user'
+            'simulator_config'
+        ).prefetch_related(
+            'files'
         ),
         id=hw_id
     )
