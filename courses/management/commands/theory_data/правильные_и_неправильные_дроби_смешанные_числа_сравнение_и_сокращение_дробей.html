@@ -1,0 +1,162 @@
+<style>
+    .math-frac {
+        display: inline-block;
+        vertical-align: middle;
+        text-align: center;
+        line-height: 1.2;
+        margin: 0 4px;
+    }
+    .math-frac .num {
+        display: block;
+        border-bottom: 2px solid currentColor;
+        padding: 0 5px;
+        font-weight: bold;
+    }
+    .math-frac .den {
+        display: block;
+        padding: 0 5px;
+    }
+    .math-mixed {
+        display: inline-flex;
+        align-items: center;
+        font-size: 1.4rem;
+    }
+    .math-mixed .whole {
+        font-size: 2rem;
+        margin-right: 4px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+</style>
+
+<h3 class="text-primary border-bottom pb-2">🍕 Что такое дробь?</h3>
+<p class="fs-5">Представь, что мы разрезали пиццу на равные кусочки. Дробь помогает записать, сколько кусочков мы взяли!</p>
+
+<div class="row align-items-center my-4">
+    <div class="col-md-5 text-center">
+        <div class="math-frac" style="font-size: 3.5rem; color: #0d6efd;">
+            <span class="num">3</span>
+            <span class="den">8</span>
+        </div>
+        <p class="fw-bold mt-3">«Три восьмых»</p>
+    </div>
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body">
+                <p>⬆️ <strong>Числитель (сверху)</strong> — сколько кусочков мы <u>взяли</u>.</p>
+                <hr>
+                <p>⬇️ <strong>Знаменатель (снизу)</strong> — на сколько <u>всего</u> частей резали пиццу.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info border-0 shadow-sm">
+    <strong>Запомни:</strong> Любое деление — это тоже дробь. Например, 6 : 2 — это то же самое, что
+    <div class="math-frac"><span class="num">6</span><span class="den">2</span></div>
+</div>
+
+===
+
+<h3 class="text-success border-bottom pb-2">⚖️ Какие бывают дроби?</h3>
+<p>Дроби бывают «послушные» (правильные) и «необычные» (неправильные).</p>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100 border-success shadow-sm">
+            <div class="card-header bg-success text-white fw-bold">😇 Правильные</div>
+            <div class="card-body text-center">
+                <p>Верхнее число <strong>меньше</strong> нижнего.<br>Такая дробь <strong>меньше целой пиццы</strong>.</p>
+                <div class="math-frac"><span class="num">2</span><span class="den">7</span></div>
+                <div class="math-frac"><span class="num">1</span><span class="den">3</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100 border-danger shadow-sm">
+            <div class="card-header bg-danger text-white fw-bold">🤪 Неправильные</div>
+            <div class="card-body text-center">
+                <p>Верхнее число <strong>больше</strong> нижнего или <strong>равно</strong> ему.<br>Это <strong>целая пицца или даже больше</strong>!</p>
+                <div class="math-frac"><span class="num">19</span><span class="den">6</span></div>
+                <div class="math-frac"><span class="num">5</span><span class="den">5</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+===
+
+<h3 class="text-warning border-bottom pb-2">🔄 Смешанные числа</h3>
+<p>Это когда у нас есть и целые коробки с пиццей, и еще несколько кусочков отдельно.</p>
+
+<div class="bg-light p-4 rounded border-start border-warning border-4 mb-4 text-center">
+    <div class="math-mixed">
+        <span class="whole">3</span>
+        <div class="math-frac">
+            <span class="num">2</span>
+            <span class="den">9</span>
+        </div>
+    </div>
+    <p class="mt-2 mb-0">Читаем: <strong>«Три целых две девятых»</strong></p>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h5 class="fw-bold text-primary">Хитрость: как убрать целое число внутрь дроби?</h5>
+        <p>1. Умножь большое число на нижнее.<br>2. Прибавь верхнее число.<br>3. Запиши результат наверх, а низ оставь прежним!</p>
+        <div class="bg-white p-2 border rounded text-center">
+            <strong>Пример:</strong>
+            <div class="math-mixed"><span class="whole">4</span><div class="math-frac"><span class="num">5</span><span class="den">7</span></div></div>
+            🔜 (4 × 7 + 5) 🔜
+            <div class="math-frac"><span class="num">33</span><span class="den">7</span></div>
+        </div>
+    </div>
+</div>
+
+===
+
+<h3 class="text-info border-bottom pb-2">✂️ Сокращаем дроби (делаем проще)</h3>
+<p>Если числитель и знаменатель можно разделить на одно и то же число — сделай это! Дробь станет выглядеть проще, но её значение не изменится.</p>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="p-3 border rounded bg-light text-center">
+            <h6>Было сложно:</h6>
+            <div class="math-frac"><span class="num">12</span><span class="den">48</span></div>
+            <p class="small text-muted">Делим оба числа на 12</p>
+            <h6>Стало просто:</h6>
+            <div class="math-frac"><span class="num">1</span><span class="den">4</span></div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="p-3 border rounded bg-light text-center">
+            <h6>Можно и наоборот!</h6>
+            <p>Умножим верх и низ на 4:</p>
+            <div class="math-frac"><span class="num">5</span><span class="den">11</span></div>
+            <span>➔</span>
+            <div class="math-frac"><span class="num">20</span><span class="den">44</span></div>
+        </div>
+    </div>
+</div>
+
+===
+
+<h3 class="text-danger border-bottom pb-2">🔍 Как сравнивать дроби?</h3>
+<p>Кто больше? Давай запомним три простых правила:</p>
+
+<div class="list-group shadow-sm">
+    <div class="list-group-item">
+        <strong>1. Если низ одинаковый:</strong><br>
+        Смотри наверх! Где число больше, та дробь и выиграла. <br>
+        <div class="math-frac"><span class="num">7</span><span class="den">9</span></div> <strong>больше, чем</strong> <div class="math-frac"><span class="num">2</span><span class="den">9</span></div>
+    </div>
+    <div class="list-group-item bg-light">
+        <strong>2. Если верх одинаковый:</strong><br>
+        Тут всё наоборот! Чем <strong>меньше</strong> число внизу, тем <strong>больше</strong> сама дробь (ведь пиццу резали на меньшее количество кусков, а значит они крупнее!). <br>
+        <div class="math-frac"><span class="num">4</span><span class="den">5</span></div> <strong>больше, чем</strong> <div class="math-frac"><span class="num">4</span><span class="den">9</span></div>
+    </div>
+    <div class="list-group-item">
+        <strong>3. Самое главное:</strong><br>
+        Любая <strong>неправильная</strong> дробь (где верх тяжелее низа) всегда <strong>больше</strong> любой правильной!
+    </div>
+</div>
