@@ -1,51 +1,52 @@
 <div class="recursive-container">
-    {# 1. ТЕМЫ уровня #}
-    <div class="topic-list">
-        {% for topic in current_section.topics.all %}
-        <div class="mb-1">
-            <a href="{% url 'topic_detail' topic.pk %}" class="item-card theme-topic d-flex align-items-center">
-                <div class="item-icon bg-blue-soft text-blue">
-                    <i class="bi bi-file-earmark-text-fill"></i>
-                </div>
-                <div class="flex-grow-1 item-title">{{ topic.title }}</div>
-                {% if topic.content_type == 'simulator' %}
-                    <span class="badge-pill-bright bg-orange">Тренажер</span>
-                {% endif %}
-                <i class="bi bi-chevron-right item-arrow"></i>
-            </a>
-        </div>
-        {% endfor %}
-    </div>
+    {% for item in current_section.get_mixed_children %}
 
-    {# 2. ПОДРАЗДЕЛЫ (Аккордеон) #}
-    <div class="accordion accordion-flush" id="accordion-{{ current_section.id }}">
-        {% for sub in current_section.subsections.all %}
-        <div class="accordion-item border-0 bg-transparent mb-1" id="accordion-item-{{ sub.id }}">
-            <h2 class="accordion-header">
-                <button class="item-card theme-folder accordion-button collapsed shadow-none"
-                        id="section-btn-{{ sub.id }}"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#collapse-{{ sub.id }}">
-                    <div class="item-icon bg-purple-soft text-purple">
-                        <i class="bi bi-folder-fill"></i>
+        {# ПРОВЕРКА: Если у объекта есть связь 'subsections', значит это Section (папка) #}
+        {% if item.subsections %}
+            <div class="accordion accordion-flush" id="accordion-{{ current_section.id }}">
+                <div class="accordion-item border-0 bg-transparent mb-1" id="accordion-item-{{ item.id }}">
+                    <h2 class="accordion-header">
+                        <button class="item-card theme-folder accordion-button collapsed shadow-none"
+                                id="section-btn-{{ item.id }}"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#collapse-{{ item.id }}">
+                            <div class="item-icon bg-purple-soft text-purple">
+                                <i class="bi bi-folder-fill"></i>
+                            </div>
+                            <div class="flex-grow-1 item-title">{{ item.title }}</div>
+                            {% with sub_count=item.topics.count %}
+                                {% if sub_count > 0 %}
+                                    <span class="badge-count">{{ sub_count }} тем</span>
+                                {% endif %}
+                            {% endwith %}
+                        </button>
+                    </h2>
+                    <div id="collapse-{{ item.id }}" class="accordion-collapse collapse">
+                        <div class="accordion-body p-0 ps-3 pt-1">
+                            {# РЕКУРСИЯ #}
+                            {% include "includes/section_recursive.html" with current_section=item %}
+                        </div>
                     </div>
-                    <div class="flex-grow-1 item-title">{{ sub.title }}</div>
-                    {% with sub_count=sub.topics.count %}
-                        {% if sub_count > 0 %}
-                            <span class="badge-count">{{ sub_count }} тем</span>
-                        {% endif %}
-                    {% endwith %}
-                </button>
-            </h2>
-            <div id="collapse-{{ sub.id }}" class="accordion-collapse collapse"
-                 data-bs-parent="#accordion-{{ current_section.id }}">
-                <div class="accordion-body p-0 ps-3 pt-1">
-                    {# РЕКУРСИЯ: вызываем этот же шаблон для вложенных подразделов #}
-                    {% include "includes/section_recursive.html" with current_section=sub %}
                 </div>
             </div>
-        </div>
-        {% endfor %}
-    </div>
+
+        {# ИНАЧЕ: Это Topic (тема) #}
+        {% else %}
+            <div class="topic-list mb-1">
+                <a href="{% url 'topic_detail' item.pk %}" class="item-card theme-topic d-flex align-items-center">
+                    <div class="item-icon bg-blue-soft text-blue">
+                        <i class="bi bi-file-earmark-text-fill"></i>
+                    </div>
+                    <div class="flex-grow-1 item-title">{{ item.title }}</div>
+                    {# Проверяем наличие теории или тренажера #}
+                    {% if item.text_content %}
+                        <span class="badge-pill-bright bg-blue-soft text-blue me-2">Теория</span>
+                    {% endif %}
+                    <i class="bi bi-chevron-right item-arrow"></i>
+                </a>
+            </div>
+        {% endif %}
+
+    {% endfor %}
 </div>
