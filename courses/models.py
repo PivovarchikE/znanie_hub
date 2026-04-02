@@ -1,4 +1,6 @@
 import os
+from itertools import chain
+from operator import attrgetter
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -31,6 +33,16 @@ class Section(BaseModel):
 
     order = models.PositiveIntegerField(default=0, help_text="Порядок вывода (чем меньше число, тем выше)")
 
+    def get_mixed_children(self):
+        """Возвращает темы и подразделы в одном списке, отсортированные по order"""
+        subsections = self.subsections.all()
+        topics = self.topics.all()
+        # Объединяем и сортируем
+        return sorted(
+            chain(subsections, topics),
+            key=attrgetter('order')
+        )
+
     def get_ancestors(self):
         ancestors = []
         curr = self.parent
@@ -59,6 +71,8 @@ class Topic(BaseModel):
     text_content = models.TextField("Теория (Markdown/HTML)", blank=True, null=True)
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок тем внутри раздела")
 
+    class Meta:
+        ordering = ['order', 'title']
 
     def __str__(self):
         return self.title
