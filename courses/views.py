@@ -6,7 +6,7 @@ from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import logger
@@ -428,10 +428,20 @@ def edit_homework_view(request, hw_id):
 @login_required
 @require_http_methods(['POST'])
 def grade_practice(request, pk):
+    if not hasattr(request.user, 'teacher_profile'):
+        return HttpResponseForbidden("Только учителя могут выставлять оценки.")
+
     homework = get_object_or_404(Homework, pk=pk, teacher=request.user.teacherprofile)
     if request.method == 'POST':
-        score = request.POST.get('actual_score')
-        homework.actual_score = score
+        try:
+            score = int(request.POST.get('actual_score'))
+            if 0 <= score <= 100:
+                homework.actual_score = score
+            else:
+                messages.error(request, "Неверный диапазон оценки")
+        except (ValueError, TypeError):
+            messages.error(request, "Оценка должна быть числом в диапазоне 1-100")
+
         homework.is_completed = True
         homework.save()
         return redirect('homework_view_detail', pk=pk)
@@ -440,7 +450,7 @@ def grade_practice(request, pk):
 @login_required
 @require_http_methods(['POST', 'GET'])
 def upload_hw_response(request, hw_id):
-    homework = get_object_or_404(Homework, id=hw_id)
+    homework = get_object_or_404(Homework, id=hw_id, student__user=request.user)
 
     if request.method == 'POST':
         files = request.FILES.getlist('files')
@@ -459,8 +469,8 @@ def upload_hw_response(request, hw_id):
 @login_required
 @require_http_methods(['POST', 'GET'])
 def grade_homework(request, hw_id):
-    homework = get_object_or_404(Homework, id=hw_id)
-    if request.method == 'POST' and request.user.role.slug == 'teacher':
+    homework = get_object_or_404(Homework, id=hw_id, teacher__user=request.user)
+    if request.method == 'POST':
         action = request.POST.get('action')
         score = request.POST.get('actual_score')
         comment_text = request.POST.get('teacher_comment')
@@ -492,7 +502,7 @@ def grade_homework(request, hw_id):
 @login_required
 @require_http_methods(['POST', 'GET'])
 def mark_theory_read(request, hw_id):
-    homework = get_object_or_404(Homework, id=hw_id)
+    homework = get_object_or_404(Homework, id=hw_id, teacher__user=request.user)
 
     if request.user.role.slug == 'teacher' and not homework.is_completed:
         if request.method == 'POST':

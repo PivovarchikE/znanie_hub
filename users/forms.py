@@ -88,6 +88,18 @@ class UserRegistrationForm(forms.ModelForm):
 
         return cleaned_data
 
+    def __init__(self, *args, **kwargs):
+        # Извлекаем роль из переданных аргументов
+        role_slug = kwargs.pop('slug', None)
+        super().__init__(*args, **kwargs)
+
+        # Если это ученик, удаляем поля физически
+        if role_slug == 'student':
+            # Удаляем из словаря полей, чтобы они не попали в HTML
+            del self.fields['middle_name']
+            del self.fields['date_of_birth']
+            del self.fields['email']
+
     # порядок отображения на фронте
     class Meta:
         model = User
@@ -148,6 +160,9 @@ class UserPhoneNumberForm(forms.ModelForm):
         self.role_slug = kwargs.pop('role_slug', None)
         super().__init__(*args, **kwargs)
 
+        self.fields['owner_name'].required = False
+        self.fields['is_primary'].required = False
+        self.fields['relationship'].required = False
         # Сообщения об ошибках на русском языке
         self.fields['number'].error_messages = {'required': 'Введите номер телефона'}
         self.fields['relationship'].error_messages = {'required': 'Укажите, чей это номер'}
@@ -171,16 +186,29 @@ class UserPhoneNumberForm(forms.ModelForm):
         # Важно: используем .get(), так как если номер не введен,
         # поле 'relationship' может отсутствовать в cleaned_data
         relationship = cleaned_data.get("relationship")
+        owner_name = cleaned_data.get("owner_name")
+        number = cleaned_data.get("number")
+
+        if not number:
+            return cleaned_data
 
         # ЕСЛИ ЭТО УЧИТЕЛЬ, ПРИНУДИТЕЛЬНО СТАВИМ "ЛИЧНЫЙ"
         if self.role_slug == 'teacher':
             relationship = UserPhoneNumber.RelationshipType.OWN
             cleaned_data['relationship'] = relationship
+            cleaned_data['owner_name'] = ""
 
         # Проверка логики
         # Если видишь такое уведомление, значит всё пошло не так)
         if self.role_slug == 'teacher' and relationship != UserPhoneNumber.RelationshipType.OWN:
             self.add_error('relationship', "Учитель может указывать только личные номера.")
+
+        if relationship == UserPhoneNumber.RelationshipType.OWN:
+            cleaned_data['owner_name'] = ""  # Если личный, затираем имя, если ввели
+        else:
+            # Если НЕ личный, проверяем наличие имени
+            if not owner_name:
+                self.add_error('owner_name', "Укажите имя владельца")
 
         return cleaned_data
 
@@ -240,11 +268,32 @@ class UserProfileEditForm(forms.ModelForm):
     username = forms.CharField(label='Имя пользователя', widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(label='Фамилия', widget=forms.TextInput(attrs={'class': 'form-control'}))
     first_name = forms.CharField(label='Имя', widget=forms.TextInput(attrs={'class': 'form-control'}))
-    middle_name = forms.CharField(label='Отчество', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    middle_name = forms.CharField(label='Отчество', widget=forms.TextInput(attrs={'class': 'form-control'}), required=False)
     date_of_birth = forms.DateField(
         label='Дата рождения',
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        required=False
     )
+    email = forms.EmailField(
+        label='Email',
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'ivanov@yandex.by'
+        }),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        role_slug = kwargs.pop('slug', None)
+        super().__init__(*args, **kwargs)
+
+        # Логика скрытия полей
+        if role_slug == 'student':
+            # Список полей, которые НЕ нужны ученику
+            excluded_fields = ['middle_name', 'date_of_birth', 'email']
+            for field_name in excluded_fields:
+                if field_name in self.fields:
+                    del self.fields[field_name]
 
     class Meta:
         model = User
