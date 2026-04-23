@@ -81,7 +81,7 @@
                                         {% endif %}
                                     </div>
 
-                                    {% if role.slug == 'student' %}
+                                    {% if role_slug == 'student' %}
                                     <div class="col-md-3">
                                         <label class="form-label fw-bold small mb-1">{{ form.relationship.label }}</label>
                                         {{ form.relationship }}
@@ -129,24 +129,19 @@
         const container = document.getElementById('phone-formset-container');
         const addButton = document.getElementById('add-phone-btn');
         const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
-        const MAX_FORMS = 5; // Устанавливаем лимит
+        const MAX_FORMS = 5;
 
         if (!container || !addButton || !totalForms) {
             console.error("Не найдены элементы формы!", {container, addButton, totalForms});
             return;
         }
 
-        // Функция для управления видимостью кнопки добавления
         function toggleAddButton() {
-            const currentRows = container.querySelectorAll('.phone-form-row').length;
-            if (currentRows >= MAX_FORMS) {
-                addButton.style.display = 'none';
-            } else {
-                addButton.style.display = 'inline-block';
-            }
+            // Считаем только те формы, которые не помечены на удаление
+            const visibleRows = container.querySelectorAll('.phone-form-row:not([style*="display: none"])').length;
+            addButton.style.display = (visibleRows >= MAX_FORMS) ? 'none' : 'inline-block';
         }
 
-        // Функция для маски
         function applyMask(row) {
             const input = row.querySelector('input[name$="-number"]');
             if (input) {
@@ -154,54 +149,96 @@
             }
         }
 
-        // Применяем маску к существующим строкам и проверяем кнопку при загрузке
         document.querySelectorAll('.phone-form-row').forEach(applyMask);
         toggleAddButton();
 
         // Добавление новой формы
         addButton.addEventListener('click', function() {
-            const rows = container.querySelectorAll('.phone-form-row');
-            const currentIndex = rows.length;
+            const allRows = container.querySelectorAll('.phone-form-row');
+            const currentIndex = parseInt(totalForms.value);
 
-            // Проверка лимита перед добавлением
-            if (currentIndex >= MAX_FORMS) {
-                alert("Максимальное количество номеров: " + MAX_FORMS);
-                return;
+            if (currentIndex >= MAX_FORMS && allRows.length === currentIndex) {
             }
 
-            const newRow = rows[0].cloneNode(true);
-            const idRegex = new RegExp(`-${0}-`, 'g');
+            // Клонируем самую первую форму
+            const newRow = allRows[0].cloneNode(true);
+
+            // Сбрасываем стили (на случай если первая была скрыта через DELETE)
+            newRow.style.display = '';
 
             newRow.querySelectorAll('input, select, label').forEach(el => {
+                // Обновляем индексы в атрибутах
                 ['name', 'id', 'for'].forEach(attr => {
                     if (el.hasAttribute(attr)) {
-                        el.setAttribute(attr, el.getAttribute(attr).replace(idRegex, `-${currentIndex}-`));
+                        el.setAttribute(attr, el.getAttribute(attr).replace(/-\d+-/g, `-${currentIndex}-`));
                     }
                 });
+
+                // Очистка значений
                 if (el.tagName === 'INPUT') {
+                    if (el.type === 'checkbox' || el.type === 'radio') {
+                        el.checked = false;
+                    } else {
+                        el.value = '';
+                    }
+                }
+
+                // Очищаем скрытое поле ID, чтобы Django создал новый объект
+                if (el.type === 'hidden' && el.name.includes('-id')) {
                     el.value = '';
+                }
+
+                // Очищаем поле DELETE, если оно попало в клон
+                if (el.type === 'checkbox' && el.name.includes('-DELETE')) {
                     el.checked = false;
                 }
             });
 
+            // Удаляем старые сообщения об ошибках из клона, если они там были
+            newRow.querySelectorAll('.text-danger').forEach(err => err.remove());
+
             container.appendChild(newRow);
             totalForms.value = currentIndex + 1;
             applyMask(newRow);
-            toggleAddButton(); // Проверяем, не пора ли скрыть кнопку
-            console.log("Добавлена форма №" + currentIndex);
+            toggleAddButton();
         });
 
         // Удаление формы
         container.addEventListener('click', function(e) {
             if (e.target.classList.contains('remove-phone-btn') || e.target.closest('.remove-phone-btn')) {
-                const rows = container.querySelectorAll('.phone-form-row');
-                if (rows.length > 1) {
-                    e.target.closest('.phone-form-row').remove();
-                    totalForms.value = container.querySelectorAll('.phone-form-row').length;
-                    toggleAddButton(); // Показываем кнопку снова, если удалили лишнее
-                } else {
+                const row = e.target.closest('.phone-form-row');
+                const allRows = container.querySelectorAll('.phone-form-row');
+                const visibleRows = Array.from(allRows).filter(r => r.style.display !== 'none');
+
+                if (visibleRows.length <= 1) {
                     alert("Минимум один номер телефона обязателен");
+                    return;
                 }
+
+                // Логика удаления Django:
+                const deleteCheckbox = row.querySelector('input[name$="-DELETE"]');
+                if (deleteCheckbox) {
+                    // Если это существующий объект (есть в базе), помечаем на удаление и скрываем
+                    deleteCheckbox.checked = true;
+                    row.style.display = 'none';
+                } else {
+                    // Если это только что добавленный объект (его еще нет в базе), просто удаляем
+                    row.remove();
+                    // Уменьшаем TOTAL_FORMS только для новых объектов
+                    totalForms.value = parseInt(totalForms.value) - 1;
+
+                    // Пересчитываем индексы оставшихся форм (важно для консистентности)
+                    container.querySelectorAll('.phone-form-row').forEach((r, idx) => {
+                        r.querySelectorAll('input, select, label').forEach(el => {
+                            ['name', 'id', 'for'].forEach(attr => {
+                                if (el.hasAttribute(attr)) {
+                                    el.setAttribute(attr, el.getAttribute(attr).replace(/-\d+-/g, `-${idx}-`));
+                                }
+                            });
+                        });
+                    });
+                }
+                toggleAddButton();
             }
         });
     });

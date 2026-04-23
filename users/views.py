@@ -22,7 +22,6 @@ from users.forms import TeacherProfileForm, StudentProfileForm, UserRegistration
 from users.models import StudentProfile, TeacherProfile, Role, UserPhoneNumber
 
 
-# добавить транзакции для сохранения
 # from.form
 @require_http_methods(["GET", "POST"])
 def dynamic_register_view(request, role_slug):
@@ -42,7 +41,7 @@ def dynamic_register_view(request, role_slug):
         raise Http404("Такой роли не существует")
 
     if request.method == 'POST':
-        u_form = UserRegistrationForm(request.POST)
+        u_form = UserRegistrationForm(request.POST, slug=role_slug)
         p_form = profile_form_class(request.POST)
         phone_formset = PhoneFormSet(request.POST, form_kwargs={'role_slug': role_slug})
 
@@ -93,7 +92,7 @@ def dynamic_register_view(request, role_slug):
 
     else:
         # GET
-        u_form = UserRegistrationForm()
+        u_form = UserRegistrationForm(slug=role_slug)
         p_form = profile_form_class()
         phone_formset = PhoneFormSet(queryset=UserPhoneNumber.objects.none())
 
@@ -143,13 +142,14 @@ def profile_edit_view(request):
     profile_instance = get_object_or_404(profile_model, user=user)
 
     if request.method == 'POST':
-        u_form = UserProfileEditForm(request.POST, instance=user)
+        u_form = UserProfileEditForm(request.POST, instance=user, slug=role_slug)
         p_form = profile_form_class(request.POST, instance=profile_instance)
         phone_formset = PhoneFormSet(
             request.POST,
             instance=user,
             form_kwargs={'role_slug': role_slug}
         )
+        phone_formset.role_slug = role_slug
 
         if u_form.is_valid() and p_form.is_valid() and phone_formset.is_valid():
             u_form.save()
@@ -164,7 +164,7 @@ def profile_edit_view(request):
             return redirect('profile_edit')
     else:
 
-        u_form = UserProfileEditForm(instance=user)
+        u_form = UserProfileEditForm(instance=user, slug=role_slug)
         p_form = profile_form_class(instance=profile_instance)
 
         phone_formset = PhoneFormSet(instance=user, form_kwargs={'role_slug': role_slug})
@@ -172,11 +172,13 @@ def profile_edit_view(request):
             phone_formset.extra = 0
 
     context = {
+        'form': u_form,
         'u_form': u_form,
         'p_form': p_form,
         'phone_formset': phone_formset,
         'role_display': user.role.name,
         'role_slug': role_slug,
+        'student': profile_instance,
     }
     return render(request, 'profile_edit.html', context)
 

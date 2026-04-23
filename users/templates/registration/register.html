@@ -132,6 +132,30 @@
             return;
         }
 
+        // БЛОК ДЛЯ ПАРОЛЕЙ (ПРЕДПРОСМОТР) ---
+        const passwordFields = document.querySelectorAll('input[type="password"]');
+        passwordFields.forEach(passwordField => {
+            const group = document.createElement('div');
+            group.className = 'input-group mb-3'; // Добавляем отступ снизу
+
+            passwordField.parentNode.insertBefore(group, passwordField);
+            group.appendChild(passwordField);
+
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-outline-secondary';
+            btn.type = 'button';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+            group.appendChild(btn);
+
+            btn.addEventListener('click', function() {
+                const isPassword = passwordField.getAttribute('type') === 'password';
+                passwordField.setAttribute('type', isPassword ? 'text' : 'password');
+                const icon = this.querySelector('i');
+                icon.classList.toggle('bi-eye');
+                icon.classList.toggle('bi-eye-slash');
+            });
+        });
+
         // Функция для управления видимостью кнопки добавления
         function toggleAddButton() {
             const currentRows = container.querySelectorAll('.phone-form-row').length;
@@ -183,6 +207,12 @@
             container.appendChild(newRow);
             totalForms.value = currentIndex + 1;
             applyMask(newRow);
+            toggleOwnerNameVisibility(newRow); // Скрываем имя, если по умолчанию 'own'
+
+            const newRelSelect = newRow.querySelector('select[name$="-relationship"]');
+            if (newRelSelect) {
+                newRelSelect.addEventListener('change', () => toggleOwnerNameVisibility(newRow));
+            }
             toggleAddButton(); // Проверяем, не пора ли скрыть кнопку
             console.log("Добавлена форма №" + currentIndex);
         });
@@ -198,6 +228,36 @@
                 } else {
                     alert("Минимум один номер телефона обязателен");
                 }
+            }
+        });
+
+        // Функция переключения видимости поля Имя
+        function toggleOwnerNameVisibility(row) {
+            const relSelect = row.querySelector('select[name$="-relationship"]');
+            const nameInput = row.querySelector('input[name$="-owner_name"]');
+
+            if (relSelect && nameInput) {
+                // Находим контейнер поля (обычно col или mb-3), чтобы скрыть его целиком
+                const nameContainer = nameInput.closest('.col-12, .col-md-4') || nameInput.parentElement;
+
+                // 'own' — это значение из твоей модели RelationshipType.OWN
+                if (relSelect.value === 'OWN') {
+                    nameContainer.style.display = 'none';
+                    nameInput.value = ''; // Очищаем при скрытии
+                } else {
+                    nameContainer.style.display = 'block';
+                }
+            }
+        }
+
+        // 1. Инициализация для текущих строк
+        container.querySelectorAll('.phone-form-row').forEach(row => {
+            toggleOwnerNameVisibility(row);
+
+            // Вешаем событие на изменение "Чей номер"
+            const relSelect = row.querySelector('select[name$="-relationship"]');
+            if (relSelect) {
+                relSelect.addEventListener('change', () => toggleOwnerNameVisibility(row));
             }
         });
     });
