@@ -81,7 +81,8 @@ INSTALLED_APPS = [
     # Local apps
     "courses",
     "users",
-    "other_pages"
+    "other_pages",
+    "schedule"
 ]
 
 MIDDLEWARE = [

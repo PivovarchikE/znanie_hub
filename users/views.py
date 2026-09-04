@@ -164,7 +164,7 @@ def profile_edit_view(request):
             return redirect('profile_edit')
     else:
 
-        u_form = UserProfileEditForm(instance=user, slug=role_slug)
+        u_form = UserProfileEditForm(instance=request.user, slug=role_slug)
         p_form = profile_form_class(instance=profile_instance)
 
         phone_formset = PhoneFormSet(instance=user, form_kwargs={'role_slug': role_slug})

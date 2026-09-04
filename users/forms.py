@@ -263,7 +263,6 @@ PhoneFormSet = inlineformset_factory(
 )
 
 
-# здесь не учтена смена пароля
 class UserProfileEditForm(forms.ModelForm):
     username = forms.CharField(label='Имя пользователя', widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(label='Фамилия', widget=forms.TextInput(attrs={'class': 'form-control'}))
@@ -297,7 +296,7 @@ class UserProfileEditForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['username', 'last_name', 'first_name', 'middle_name', 'date_of_birth']
+        fields = ['username', 'last_name', 'first_name', 'middle_name', 'date_of_birth', 'email']
 
 
 class StudentEditForm(forms.ModelForm):
