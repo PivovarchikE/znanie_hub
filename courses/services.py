@@ -9,7 +9,7 @@ def generate_math_tasks_addition_and_substraction(config_params):
     problems = []
     min_val = config_params.get('min', 1)
     max_val = config_params.get('max', 100)
-    operations = config_params.get('operations', ['+'])
+    operations = config_params.get('operations', ['+', '-'])
 
     for _ in range(5):
         a = random.randint(min_val, max_val)
