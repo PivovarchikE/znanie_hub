@@ -1,0 +1,921 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- Безопасный проброс контекста из Django в Alpine.js без доп. API-запросов -->
+{{ students|json_script:"students-data" }}
+{{ subjects|json_script:"subjects-data" }}
+
+<style>
+  [x-cloak] { display: none !important; }
+
+  @media (min-width: 768px) {
+    .row-cols-md-7 > * {
+      flex: 0 0 auto;
+      width: 14.285714%;
+    }
+  }
+
+  .schedule-card {
+    transition: all 0.2s ease-in-out;
+  }
+  .schedule-card:hover {
+    transform: translateY(-2px);
+  }
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  /* Стили для месячной сетки */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+</style>
+
+<div class="w-full max-w-7xl mx-auto" x-data="scheduleApp()">
+
+  <!-- Заголовок и элементы управления -->
+  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="h3 font-weight-bold mb-1">Расписание занятий</h1>
+      <p class="text-muted small mb-0">Управление уроками, повторами и аналитикой</p>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <!-- Переключатель режима отображения: Неделя / Месяц -->
+      <div class="btn-group bg-light p-1 rounded-3 border">
+        <button
+          type="button"
+          @click="setViewMode('week')"
+          :class="viewMode === 'week' ? 'btn-white shadow-sm font-weight-bold text-dark' : 'text-muted'"
+          class="btn btn-sm transition-all border-0 rounded-2 px-3">
+          Неделя
+        </button>
+        <button
+          type="button"
+          @click="setViewMode('month')"
+          :class="viewMode === 'month' ? 'btn-white shadow-sm font-weight-bold text-dark' : 'text-muted'"
+          class="btn btn-sm transition-all border-0 rounded-2 px-3">
+          Месяц
+        </button>
+      </div>
+
+      <!-- Выбор ученика -->
+      <select class="form-select form-select-sm shadow-sm rounded-3 style-select" x-model="selectedStudent" @change="fetchScheduleData()" style="width: auto;">
+        <option value="">Все ученики</option>
+        <template x-for="s in students" :key="s.id">
+          <option :value="s.id" x-text="s.name"></option>
+        </template>
+      </select>
+
+      <!-- Быстрый выбор конкретной даты -->
+      <input type="date" class="form-control form-control-sm shadow-sm rounded-3" x-model="pickerDate" @change="onDatePickerChange()" style="width: auto;">
+
+      <!-- Навигация по периодам -->
+      <div class="btn-group bg-white shadow-sm rounded-3 p-1">
+        <button @click="prevPeriod()" type="button" class="btn btn-sm btn-light border-0">&larr; Назад</button>
+        <button @click="currentPeriod()" type="button" class="btn btn-sm btn-light border-0 fw-semibold">
+          <span x-text="viewMode === 'week' ? 'Текущая неделя' : 'Текущий месяц'"></span>
+        </button>
+        <button @click="nextPeriod()" type="button" class="btn btn-sm btn-light border-0">Вперед &rarr;</button>
+      </div>
+
+      <button @click="openModal()" type="button" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm rounded-3 px-3">
+        <span>+ Добавить урок</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Карточки аналитики -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-2">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+        <div class="text-muted small fw-semibold">Уроков за период</div>
+        <div class="h3 font-weight-bold text-primary mb-0 mt-1" x-text="stats.totalLessons">0</div>
+        <div class="small text-muted mt-1" x-text="stats.totalHours + ' ч.'">0 ч.</div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-2">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+        <div class="text-muted small fw-semibold">Проведено / Отменено</div>
+        <div class="h4 font-weight-bold text-dark mb-0 mt-1">
+          <span class="text-success" x-text="stats.completedLessons">0</span> /
+          <span class="text-danger" x-text="stats.canceledLessons">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-2">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+        <div class="text-muted small fw-semibold">Оплаченные уроки</div>
+        <div class="h3 font-weight-bold text-success mb-0 mt-1" x-text="stats.paidLessons">0</div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+        <div class="text-muted small fw-semibold">Полученный доход</div>
+        <div class="h3 font-weight-bold text-success mb-0 mt-1" x-text="stats.totalRevenue + ' BYN'">0 BYN</div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+        <div class="text-muted small fw-semibold">Ожидается к поступлению</div>
+        <div class="h3 font-weight-bold text-warning mb-0 mt-1" x-text="stats.expectedRevenue + ' BYN'">0 BYN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. СЕТКА НЕДЕЛИ (Обычный вид) -->
+  <div x-show="viewMode === 'week'" class="row row-cols-1 row-cols-md-7 g-2 mb-4">
+    <template x-for="(day, index) in days" :key="index">
+      <div class="col">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-2 bg-white">
+          <div class="text-center py-2 border-bottom mb-2">
+            <div class="small text-muted text-uppercase fw-bold" x-text="day.name"></div>
+            <div class="fw-bold fs-5 text-dark" x-text="day.date"></div>
+          </div>
+
+          <div class="d-flex flex-column gap-2" style="min-height: 250px;">
+            <template x-for="lesson in day.lessons" :key="lesson.id">
+              <div
+                class="card border p-2 schedule-card cursor-pointer rounded-3 position-relative overflow-hidden"
+                :class="{
+                  'border-success bg-success-subtle': lesson.status === 'COMPLETED',
+                  'border-danger bg-danger-subtle opacity-75': lesson.status === 'CANCELED',
+                  'border-primary-subtle bg-light': lesson.status === 'SCHEDULED'
+                }"
+                @click="editLesson(lesson)"
+              >
+                <!-- Индикатор наложения -->
+                <template x-if="lesson.is_overlapping && lesson.status !== 'CANCELED'">
+                  <div class="badge bg-danger text-white mb-1 w-100 text-truncate" style="font-size: 9px;">
+                    ⚠️ Наложение времени
+                  </div>
+                </template>
+
+                <div class="d-flex align-items-center justify-content-between gap-1 mb-1 flex-nowrap">
+                  <span class="badge bg-dark text-white font-monospace text-nowrap px-1.5 py-1" style="font-size: 10px;" x-text="lesson.start_time + '-' + lesson.end_time"></span>
+                  <span
+                    class="badge text-nowrap px-1.5 py-1"
+                    style="font-size: 10px;"
+                    :class="lesson.payment_status === 'PAID' ? 'bg-success' : 'bg-warning text-dark'"
+                    x-text="lesson.payment_status === 'PAID' ? 'Оплачено' : 'Не оплачено'">
+                  </span>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between gap-1">
+                  <a
+                    :href="`{% url 'student_detail' 0 %}`.replace('0', lesson.student_id)"
+                    @click.stop
+                    class="fw-semibold text-truncate small text-primary text-decoration-none"
+                    x-text="lesson.student_name">
+                  </a>
+                  <template x-if="lesson.is_recurring">
+                    <span class="badge bg-info text-dark p-0 px-1 text-nowrap" title="Повторяющееся занятие" style="font-size: 10px;">🔄</span>
+                  </template>
+                </div>
+
+                <div class="text-muted text-truncate" style="font-size: 11px;"
+                     x-text="(() => {
+                         const cls = students.find(s => String(s.id) === String(lesson.student_id))?.school_class;
+                         return [
+                             lesson.subject_name,
+                             cls ? `${cls} класс` : null
+                         ].filter(Boolean).join(', ');
+                     })()">
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-1 gap-1">
+                  <span class="fw-bold text-nowrap" style="font-size: 12px;" x-text="lesson.price + ' BYN'"></span>
+                  <span class="badge text-uppercase text-nowrap px-1.5 py-0.5"
+                        style="font-size: 9px;"
+                        :class="{'bg-secondary': lesson.status === 'SCHEDULED', 'bg-success': lesson.status === 'COMPLETED', 'bg-danger': lesson.status === 'CANCELED'}"
+                        x-text="lesson.status === 'SCHEDULED' ? 'Назначено' : (lesson.status === 'COMPLETED' ? 'Проведено' : 'Отменено')">
+                  </span>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="day.lessons.length === 0">
+              <div class="h-100 d-flex align-items-center justify-content-center text-muted small py-4">
+                Нет уроков
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- 2. СЕТКА МЕСЯЦА (Упрощенный вид) -->
+  <div x-show="viewMode === 'month'" class="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4 overflow-hidden">
+    <!-- Заголовки дней недели -->
+    <div class="month-grid border-bottom pb-2 mb-2 text-center text-muted fw-bold small">
+      <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+    </div>
+
+    <!-- Ячейки месяца -->
+    <div class="month-grid gap-1">
+      <template x-for="day in monthDays" :key="day.dateStr">
+        <div
+          :class="day.isCurrentMonth ? 'bg-white' : 'bg-light opacity-50'"
+          class="border rounded-3 p-1 flex-column d-flex justify-content-start"
+          style="min-height: 110px;">
+
+          <!-- Номер дня -->
+          <div class="d-flex justify-content-between align-items-center mb-1 px-1">
+            <span class="fw-bold small text-muted" x-text="day.dayNumber"></span>
+            <template x-if="day.lessons.length > 0">
+              <span class="badge rounded-pill bg-secondary" style="font-size: 9px;" x-text="day.lessons.length"></span>
+            </template>
+          </div>
+
+          <!-- Список плашек интервалов -->
+          <div class="d-flex flex-column gap-1 overflow-auto" style="max-height: 90px;">
+            <template x-for="lesson in day.lessons" :key="lesson.id">
+              <div
+                @click="editLesson(lesson)"
+                :class="{
+                  'bg-success-subtle text-success-emphasis border-success-subtle': lesson.status === 'COMPLETED',
+                  'bg-light text-dark border-secondary-subtle': lesson.status === 'SCHEDULED',
+                  'bg-danger-subtle text-danger-emphasis border-danger-subtle text-decoration-line-through': lesson.status === 'CANCELED',
+                  'border-danger ring-1': lesson.is_overlapping
+                }"
+                class="p-1 rounded border cursor-pointer text-truncate"
+                style="font-size: 10px; line-height: 1.2;"
+                :title="`${lesson.start_time}-${lesson.end_time}: ${lesson.student_name} (${lesson.subject_name})`">
+
+                <span class="font-monospace fw-bold" x-text="`${lesson.start_time}-${lesson.end_time}`"></span>
+                <span class="fw-semibold ms-1" x-text="lesson.student_name"></span>
+              </div>
+            </template>
+          </div>
+
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Диалоговое окно выбора области применения при сохранении серии -->
+  <div
+    x-show="showEditModeModal"
+    x-cloak
+    class="modal fade show"
+    :class="{ 'd-block': showEditModeModal }"
+    style="background-color: rgba(0,0,0,0.6); z-index: 1060;"
+    @keydown.escape.window="showEditModeModal = false"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg rounded-4 p-3">
+        <h6 class="fw-bold mb-2">Обновление серии уроков</h6>
+        <p class="small text-muted mb-3">
+          Вы изменяете урок, входящий в серию. Применить изменения ко всем следующим занятиям?
+        </p>
+
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-sm btn-primary" @click="confirmSave('future')">
+            Этот и все будущие уроки
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" @click="confirmSave('this_only')">
+            Только этот урок
+          </button>
+          <button type="button" class="btn btn-sm btn-link text-muted" @click="showEditModeModal = false">
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно создания / редактирования урока -->
+  <div
+    x-show="isModalOpen"
+    x-cloak
+    class="modal fade show"
+    :class="{ 'd-block': isModalOpen }"
+    style="background-color: rgba(0,0,0,0.5); z-index: 1055;"
+    @keydown.escape.window="closeModal()"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg rounded-4">
+
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold" x-text="form.id ? 'Редактировать урок' : 'Добавить урок'"></h5>
+          <button type="button" class="btn-close" @click="closeModal()"></button>
+        </div>
+
+        <form @submit.prevent="submitForm()">
+          <div class="modal-body">
+
+            <!-- Предупреждение о конфликте по времени -->
+            <template x-if="overlapWarning">
+              <div class="alert alert-warning border-warning rounded-3 mb-3 small d-flex flex-column gap-2" role="alert">
+                <span x-text="overlapWarning"></span>
+                <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" @click="confirmSave('this_only', true)">
+                  Всё равно сохранить
+                </button>
+              </div>
+            </template>
+
+            <!-- Предупреждение о недостаточности данных -->
+            <template x-if="students.length === 0 || subjects.length === 0">
+              <div class="alert alert-warning rounded-3 mb-3 small" role="alert">
+                <div class="fw-bold mb-1">Нельзя создать урок!</div>
+                <template x-if="students.length === 0">
+                  <div>• У вас нет привязанных учеников.</div>
+                </template>
+                <template x-if="subjects.length === 0">
+                  <div>• У вас нет созданных предметов.</div>
+                </template>
+              </div>
+            </template>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Ученик</label>
+                <select x-model="form.student_id" class="form-select" required :disabled="students.length === 0">
+                  <option value="" disabled>Выберите ученика...</option>
+                  <template x-for="student in students" :key="student.id">
+                    <option :value="String(student.id)" x-text="student.name"></option>
+                  </template>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Предмет</label>
+                <select x-model="form.subject_id" class="form-select" required :disabled="subjects.length === 0">
+                  <option value="" disabled>Выберите предмет...</option>
+                  <template x-for="subject in subjects" :key="subject.id">
+                    <option :value="String(subject.id)" x-text="subject.name"></option>
+                  </template>
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Дата</label>
+                <input type="date" x-model="form.date" class="form-control" required @change="overlapWarning = null">
+              </div>
+
+              <!-- Время -->
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Время начала</label>
+                <input type="time" class="form-control" x-model="form.start_time" step="900" required @change="syncEndTime()">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Время окончания</label>
+                <input type="time" class="form-control" x-model="form.end_time" step="900" required @change="overlapWarning = null">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Стоимость (BYN)</label>
+                <input type="text" x-model="form.price_input" class="form-control" placeholder="0.00" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Статус занятия</label>
+                <select x-model="form.status" class="form-select">
+                  <option value="SCHEDULED">Назначено</option>
+                  <option value="COMPLETED">Проведено</option>
+                  <option value="CANCELED">Отменено</option>
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Оплата</label>
+                <select x-model="form.payment_status" class="form-select">
+                  <option value="UNPAID">Не оплачено</option>
+                  <option value="PAID">Оплачено</option>
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Тема занятия</label>
+                <input type="text" x-model="form.topic" class="form-control" placeholder="Например: Решение квадратных уравнений">
+              </div>
+
+              <!-- Повторяющиеся занятия -->
+              <div class="col-12 border-top pt-3 mt-2">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" x-model="form.is_recurring" id="isRecurringCheck">
+                  <label class="form-check-label fw-semibold" for="isRecurringCheck">Повторять урок (Серия)</label>
+                </div>
+
+                <div x-show="form.is_recurring" class="bg-light p-3 rounded-3 mt-2 border">
+                  <label class="form-label small fw-semibold mb-1">Дни недели повтора:</label>
+                  <div class="d-flex flex-wrap gap-2 mb-3">
+                    <template x-for="(dayName, dayIdx) in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']" :key="dayIdx">
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        :class="form.days_of_week.includes(dayIdx) ? 'btn-primary' : 'btn-outline-secondary'"
+                        @click="toggleDay(dayIdx)"
+                        x-text="dayName">
+                      </button>
+                    </template>
+                  </div>
+
+                  <div class="row align-items-center">
+                    <div class="col-auto">
+                      <label class="form-label small fw-semibold mb-0">Повторять вперед на:</label>
+                    </div>
+                    <div class="col-auto">
+                      <input type="number" class="form-control form-control-sm" style="width: 80px;" x-model.number="form.weeks_count" min="1" max="24">
+                    </div>
+                    <div class="col-auto">
+                      <span class="small text-muted">недель</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-light" @click="closeModal()">Отмена</button>
+
+            <template x-if="form.id">
+              <button type="button" class="btn btn-outline-danger me-auto" @click="openDeleteDialog()">Удалить</button>
+            </template>
+
+            <button
+              type="submit"
+              class="btn btn-primary px-4"
+              :disabled="students.length === 0 || subjects.length === 0"
+            >
+              Сохранить
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно выбора режима удаления серии -->
+  <div
+    x-show="isDeleteModalOpen"
+    x-cloak
+    class="modal fade show"
+    :class="{ 'd-block': isDeleteModalOpen }"
+    style="background-color: rgba(0,0,0,0.6); z-index: 1060;"
+    @keydown.escape.window="isDeleteModalOpen = false"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg rounded-4 p-3">
+        <h6 class="fw-bold mb-3">Удаление занятия</h6>
+
+        <template x-if="form.is_recurring">
+          <p class="small text-muted mb-3">Укажите, какие уроки из этой серии необходимо удалить:</p>
+        </template>
+
+        <template x-if="!form.is_recurring">
+          <p class="small text-muted mb-3">Вы действительно хотите удалить это занятие?</p>
+        </template>
+
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" @click="confirmDelete('this_only')">
+            <span x-text="form.is_recurring ? 'Только это занятие' : 'Удалить'"></span>
+          </button>
+
+          <template x-if="form.is_recurring">
+            <button type="button" class="btn btn-sm btn-outline-warning" @click="confirmDelete('future')">Это и все будущие</button>
+          </template>
+
+          <template x-if="form.is_recurring">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="confirmDelete('all')">Всю серию полностью</button>
+          </template>
+
+          <button type="button" class="btn btn-sm btn-link text-muted" @click="isDeleteModalOpen = false">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function scheduleApp() {
+  return {
+    viewMode: 'week', // 'week' или 'month'
+    isModalOpen: false,
+    isDeleteModalOpen: false,
+    showEditModeModal: false,
+    overlapWarning: null,
+    selectedStudent: '',
+    pickerDate: '',
+    currentDate: new Date(),
+    days: [],
+    monthDays: [],
+    students: [],
+    subjects: [],
+    rawLessons: [],
+
+    stats: {
+      totalLessons: 0,
+      completedLessons: 0,
+      canceledLessons: 0,
+      paidLessons: 0,
+      totalHours: 0,
+      totalRevenue: 0,
+      expectedRevenue: 0
+    },
+
+    form: {
+      id: null,
+      parent_lesson_id: null,
+      student_id: '',
+      subject_id: '',
+      date: '',
+      start_time: '12:00',
+      end_time: '13:00',
+      price_input: '',
+      status: 'SCHEDULED',
+      payment_status: 'UNPAID',
+      topic: '',
+      is_recurring: false,
+      days_of_week: [],
+      weeks_count: 4
+    },
+
+    init() {
+      try {
+        const studentsScript = document.getElementById('students-data');
+        const subjectsScript = document.getElementById('subjects-data');
+
+        if (studentsScript && studentsScript.textContent.trim()) {
+          this.students = JSON.parse(studentsScript.textContent);
+        }
+
+        if (subjectsScript && subjectsScript.textContent.trim()) {
+          this.subjects = JSON.parse(subjectsScript.textContent);
+        }
+      } catch (err) {
+        console.error("Ошибка парсинга контекста Django:", err);
+      }
+
+      this.pickerDate = this.formatDate(this.currentDate);
+      this.fetchScheduleData();
+    },
+
+    setViewMode(mode) {
+      this.viewMode = mode;
+      this.fetchScheduleData();
+    },
+
+    formatDate(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+
+    onDatePickerChange() {
+      if (this.pickerDate) {
+        const [y, m, d] = this.pickerDate.split('-').map(Number);
+        this.currentDate = new Date(y, m - 1, d);
+        this.fetchScheduleData();
+      }
+    },
+
+    async fetchScheduleData() {
+      const dateStr = this.formatDate(this.currentDate);
+      const baseUrl = "{% url 'schedule:api_get_week' %}";
+      let url = `${baseUrl}?date=${dateStr}&view_type=${this.viewMode}`;
+
+      if (this.selectedStudent) {
+        url += `&student_id=${this.selectedStudent}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Ошибка получения данных");
+
+        const data = await response.json();
+        this.rawLessons = data.lessons || [];
+
+        if (data.analytics) {
+          this.stats.totalLessons = data.analytics.total_lessons || 0;
+          this.stats.completedLessons = data.analytics.completed_lessons || 0;
+          this.stats.canceledLessons = data.analytics.canceled_lessons || 0;
+          this.stats.paidLessons = data.analytics.paid_lessons || 0;
+          this.stats.totalHours = data.analytics.total_hours || 0;
+          this.stats.totalRevenue = data.analytics.total_revenue || 0;
+          this.stats.expectedRevenue = data.analytics.expected_revenue || 0;
+        }
+
+        if (this.viewMode === 'month') {
+          this.renderMonthGrid();
+        } else {
+          this.renderWeekGrid(data.period_start || dateStr);
+        }
+      } catch (err) {
+        console.error("Не удалось загрузить расписание:", err);
+      }
+    },
+
+    renderWeekGrid(weekStartStr) {
+      const weekNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+      let startDate = new Date();
+      if (weekStartStr) {
+        const [y, m, d] = weekStartStr.split('-').map(Number);
+        startDate = new Date(y, m - 1, d);
+      }
+
+      this.days = weekNames.map((name, index) => {
+        const dayDate = new Date(startDate);
+        dayDate.setDate(startDate.getDate() + index);
+        const dayStr = this.formatDate(dayDate);
+
+        return {
+          name: name,
+          date: dayDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
+          raw_date: dayStr,
+          lessons: this.rawLessons.filter(l => l.date === dayStr)
+        };
+      });
+    },
+
+    renderMonthGrid() {
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+
+      let startDayOfWeek = firstDayOfMonth.getDay() - 1;
+      if (startDayOfWeek === -1) startDayOfWeek = 6;
+
+      const grid = [];
+
+      // Заполнение предыдущего месяца
+      for (let i = startDayOfWeek; i > 0; i--) {
+        const prevDate = new Date(year, month, 1 - i);
+        grid.push(this.createMonthDayObject(prevDate, false));
+      }
+
+      // Дни текущего месяца
+      for (let d = 1; d <= lastDayOfMonth.getDate(); d++) {
+        const currDate = new Date(year, month, d);
+        grid.push(this.createMonthDayObject(currDate, true));
+      }
+
+      // Заполнение остатка последней недели
+      const remainingSlots = (7 - (grid.length % 7)) % 7;
+      for (let i = 1; i <= remainingSlots; i++) {
+        const nextDate = new Date(year, month + 1, i);
+        grid.push(this.createMonthDayObject(nextDate, false));
+      }
+
+      this.monthDays = grid;
+    },
+
+    createMonthDayObject(dateObj, isCurrentMonth) {
+      const dateStr = this.formatDate(dateObj);
+      return {
+        dateStr: dateStr,
+        dayNumber: dateObj.getDate(),
+        isCurrentMonth: isCurrentMonth,
+        lessons: this.rawLessons.filter(l => l.date === dateStr)
+      };
+    },
+
+    prevPeriod() {
+      if (this.viewMode === 'month') {
+        this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+      } else {
+        this.currentDate.setDate(this.currentDate.getDate() - 7);
+      }
+      this.pickerDate = this.formatDate(this.currentDate);
+      this.fetchScheduleData();
+    },
+
+    nextPeriod() {
+      if (this.viewMode === 'month') {
+        this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+      } else {
+        this.currentDate.setDate(this.currentDate.getDate() + 7);
+      }
+      this.pickerDate = this.formatDate(this.currentDate);
+      this.fetchScheduleData();
+    },
+
+    currentPeriod() {
+      this.currentDate = new Date();
+      this.pickerDate = this.formatDate(this.currentDate);
+      this.fetchScheduleData();
+    },
+
+    openModal() {
+      this.resetForm();
+      this.isModalOpen = true;
+    },
+
+    closeModal() {
+      this.isModalOpen = false;
+      this.showEditModeModal = false;
+      this.overlapWarning = null;
+    },
+
+    editLesson(lesson) {
+      this.overlapWarning = null;
+
+      let dayIdx = 0;
+      if (lesson.date) {
+        const [year, month, day] = lesson.date.split('-').map(Number);
+        const dt = new Date(year, month - 1, day);
+        dayIdx = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+      }
+
+      this.form = {
+        id: lesson.id,
+        parent_lesson_id: lesson.parent_lesson_id || null,
+        student_id: String(lesson.student_id),
+        subject_id: String(lesson.subject_id),
+        date: lesson.date,
+        start_time: lesson.start_time,
+        end_time: lesson.end_time || this.calculateEndTime(lesson.start_time, 60),
+        price_input: String(lesson.price).replace('.', ','),
+        status: lesson.status || 'SCHEDULED',
+        payment_status: lesson.payment_status || 'UNPAID',
+        topic: lesson.topic || '',
+        is_recurring: Boolean(lesson.is_recurring),
+        days_of_week: lesson.days_of_week || [dayIdx],
+        weeks_count: lesson.weeks_count || 4
+      };
+      this.isModalOpen = true;
+    },
+
+    resetForm() {
+      this.overlapWarning = null;
+      const todayDate = new Date();
+      this.form = {
+        id: null,
+        parent_lesson_id: null,
+        student_id: this.students.length > 0 ? String(this.students[0].id) : '',
+        subject_id: this.subjects.length > 0 ? String(this.subjects[0].id) : '',
+        date: this.formatDate(todayDate),
+        start_time: '12:00',
+        end_time: '13:00',
+        price_input: '',
+        status: 'SCHEDULED',
+        payment_status: 'UNPAID',
+        topic: '',
+        is_recurring: false,
+        days_of_week: [todayDate.getDay() === 0 ? 6 : todayDate.getDay() - 1],
+        weeks_count: 4
+      };
+    },
+
+    toggleDay(idx) {
+      const pos = this.form.days_of_week.indexOf(idx);
+      if (pos > -1) {
+        this.form.days_of_week.splice(pos, 1);
+      } else {
+        this.form.days_of_week.push(idx);
+        this.form.days_of_week.sort((a, b) => a - b);
+      }
+    },
+
+    syncEndTime() {
+      this.overlapWarning = null;
+      this.form.end_time = this.calculateEndTime(this.form.start_time, 60);
+    },
+
+    calculateEndTime(startTimeStr, durationMinutes = 60) {
+      if (!startTimeStr || !startTimeStr.includes(':')) return '13:00';
+      const [hours, minutes] = startTimeStr.split(':').map(Number);
+      if (isNaN(hours) || isNaN(minutes)) return '13:00';
+
+      const date = new Date();
+      date.setHours(hours, minutes + durationMinutes);
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    },
+
+    parsePrice(val) {
+      if (!val) return 0;
+      const normalized = String(val).replace(',', '.').trim();
+      const parsed = parseFloat(normalized);
+      return isNaN(parsed) ? 0 : parsed;
+    },
+
+    submitForm() {
+      if (!this.form.student_id || !this.form.subject_id) {
+        alert('Заполните учеников и предметы перед сохранением урока.');
+        return;
+      }
+
+      if (this.form.id && (this.form.is_recurring || this.form.parent_lesson_id)) {
+        this.showEditModeModal = true;
+      } else {
+        this.confirmSave('this_only');
+      }
+    },
+
+    async confirmSave(updateMode = 'this_only', forceSave = false) {
+      this.showEditModeModal = false;
+
+      const payload = {
+        id: this.form.id,
+        student_id: this.form.student_id,
+        subject_id: this.form.subject_id,
+        date: this.form.date,
+        start_time: this.form.start_time,
+        end_time: this.form.end_time,
+        price: this.parsePrice(this.form.price_input),
+        status: this.form.status,
+        payment_status: this.form.payment_status,
+        topic: this.form.topic,
+        is_recurring: this.form.is_recurring,
+        days_of_week: this.form.days_of_week,
+        weeks_count: this.form.weeks_count,
+        update_mode: updateMode,
+        force_save: forceSave
+      };
+
+        try {
+          const response = await fetch("{% url 'schedule:api_save' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': this.getCsrfToken()
+            },
+            body: JSON.stringify(payload)
+          });
+
+        const result = await response.json();
+
+        if (result.warning_overlap) {
+          this.overlapWarning = result.message;
+          return;
+        }
+
+        if (!response.ok || !result.success) {
+          alert(result.message || 'Ошибка сохранения урока.');
+          return;
+        }
+
+        this.closeModal();
+        await this.fetchScheduleData();
+      } catch (err) {
+        console.error("Ошибка сохранения урока:", err);
+        alert('Ошибка связи с сервером.');
+      }
+    },
+
+    openDeleteDialog() {
+      if (!this.form.id) return;
+      this.isDeleteModalOpen = true;
+    },
+
+    async confirmDelete(mode) {
+      this.isDeleteModalOpen = false;
+
+      try {
+        // Подставляем ID урока в URL через шаблонизатор Django
+        const deleteUrl = "{% url 'schedule:api_delete' 0 %}".replace('0', this.form.id);
+
+        const response = await fetch(deleteUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.getCsrfToken()
+          },
+          body: JSON.stringify({ mode: mode })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && (result.success || result.status === 'ok')) {
+          this.closeModal();
+          await this.fetchScheduleData();
+        } else {
+          alert(result.message || result.error || 'Не удалось удалить занятие.');
+        }
+      } catch (err) {
+        console.error("Ошибка при удалении урока:", err);
+        alert('Произошла ошибка при связи с сервером.');
+      }
+    },
+
+    getCsrfToken() {
+      const name = 'csrftoken';
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  }
+}
+</script>
+{% endblock %}

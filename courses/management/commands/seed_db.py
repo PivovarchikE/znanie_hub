@@ -1,6 +1,8 @@
 import os
 import re
+from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 from users.models import Role, SchoolClass
@@ -22,6 +24,22 @@ class Command(BaseCommand):
             # управление попадет сюда, а в БД изменений не будет.
             self.stderr.write(self.style.ERROR(f"Произошла ошибка: {e}"))
             self.stderr.write(self.style.WARNING("База данных откачена до исходного состояния."))
+
+    def prepare_media_structure(self):
+        """Создает необходимые папки в MEDIA_ROOT, если их нет"""
+        self.stdout.write("Проверка структуры медиа-папок...")
+
+        # Берем путь из настроек или вычисляем относительно BASE_DIR
+        media_root = Path(settings.MEDIA_ROOT)
+        subfolders = ['avatars', 'homeworks', 'responses']
+
+        for folder in subfolders:
+            path = media_root / folder
+            # parents=True создаст и саму media/, если её нет
+            # exist_ok=True предотвращает ошибку, если папка уже существует
+            path.mkdir(parents=True, exist_ok=True)
+
+        self.stdout.write(self.style.SUCCESS(f"Структура медиа проверена в: {media_root}"))
 
     def perform_seeding(self):
         self.stdout.write("Проверка таблиц...")

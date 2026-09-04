@@ -8,12 +8,11 @@ from users.models import StudentProfile
 @pytest.mark.django_db
 class TestGlobalSearch:
 
-    def test_search_access_denied_for_anonymous(self, client):
-        """Проверка, что без логина поиск недоступен."""
+    def test_search_access_allowed_for_anonymous(self, client):
+        """Проверка, что без логина поиск доступен."""
         url = reverse('global_search')
         response = client.get(url)
-        assert response.status_code == 302
-        assert 'login' in response.url
+        assert response.status_code == 200
 
     def test_short_query_returns_none(self, client, student_user):
         """Запрос меньше 2 символов не возвращает результаты."""
