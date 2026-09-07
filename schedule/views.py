@@ -74,20 +74,24 @@ def get_week_schedule_api(request):
 
     # Динамический расчет временного диапазона в зависимости от view_type
     if view_type == 'month':
-        # Диапазон месяца + захват соседних дней для полного 7-колоночного календаря
-        first_day_of_month = target_date.replace(day=1)
+        # 1. Границы целевого месяца для АНАЛИТИКИ
+        analytics_start = target_date.replace(day=1)
         _, last_day_num = monthrange(target_date.year, target_date.month)
-        last_day_of_month = target_date.replace(day=last_day_num)
+        analytics_end = target_date.replace(day=last_day_num)
 
-        # Выравниваем до Понедельника первой недели и Воскресенья последней недели
-        start_date = first_day_of_month - timedelta(days=first_day_of_month.weekday())
-        end_date = last_day_of_month + timedelta(days=(6 - last_day_of_month.weekday()))
+        # 2. Расширенный диапазон сетки для ОТОБРАЖЕНИЯ (включая серые дни)
+        start_date = analytics_start - timedelta(days=analytics_start.weekday())
+        end_date = analytics_end + timedelta(days=(6 - analytics_end.weekday()))
     else:
         # Режим 'week': Расчет понедельника и воскресенья недели
         start_date = target_date - timedelta(days=target_date.weekday())
         end_date = start_date + timedelta(days=6)
 
-    # 1. Загружаем ВСЕ уроки преподавателя за период для корректного вычисления наложений
+        # Для недели границы аналитики совпадают с границами периода
+        analytics_start = start_date
+        analytics_end = end_date
+
+    # 1. Загружаем ВСЕ уроки преподавателя за период сетки
     all_period_lessons = list(
         Lesson.objects.filter(
             teacher=teacher,
@@ -135,13 +139,13 @@ def get_week_schedule_api(request):
             'is_overlapping': has_overlap
         })
 
-    # Расчет аналитики передает выбранный диапазон
-    analytics = calculate_schedule_analytics(teacher, start_date, end_date, student_id)
+    # Передаем точные границы целевого месяца/недели в аналитику
+    analytics = calculate_schedule_analytics(teacher, analytics_start, analytics_end, student_id)
 
     return JsonResponse({
         'period_start': start_date.strftime('%Y-%m-%d'),
         'period_end': end_date.strftime('%Y-%m-%d'),
-        'week_start': start_date.strftime('%Y-%m-%d'),  # Для обратной совместимости
+        'week_start': start_date.strftime('%Y-%m-%d'),
         'week_end': end_date.strftime('%Y-%m-%d'),
         'lessons': lessons_data,
         'analytics': analytics
