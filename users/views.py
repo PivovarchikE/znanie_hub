@@ -1,9 +1,11 @@
 import io
 import os
+from collections import defaultdict
 
 from PIL import Image
 from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView
+from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.http import Http404
@@ -12,14 +14,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, logout, get_user_model
 from django.core.paginator import Paginator
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.forms import inlineformset_factory
 
 from courses import models
 from users.forms import TeacherProfileForm, StudentProfileForm, UserRegistrationForm, PhoneFormSet, UserPhoneNumberForm, \
-    BasePhoneFormSet, UserProfileEditForm, AvatarUpdateForm
-from users.models import StudentProfile, TeacherProfile, Role, UserPhoneNumber
+    BasePhoneFormSet, UserProfileEditForm, AvatarUpdateForm, StudentGroupForm
+from users.models import StudentProfile, TeacherProfile, Role, UserPhoneNumber, StudentGroup
 
 
 # from.form
@@ -251,3 +253,128 @@ class UserPasswordChangeView(PasswordChangeView):
     def form_valid(self, form):
         messages.success(self.request, 'Пароль успешно изменен!')
         return super().form_valid(form)
+
+
+@login_required
+def group_create_view(request):
+    """Создание новой группы учеников"""
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        messages.error(request, "Доступ разрешен только преподавателям.")
+        return redirect('teacher_dashboard')
+
+    if request.method == 'POST':
+        form = StudentGroupForm(request.POST, teacher_profile=teacher_profile)
+        if form.is_valid():
+            group = form.save(commit=False)
+            group.teacher = teacher_profile
+            group.is_active = True  # <--- Автоматически делаем группу активной
+            group.save()
+            form.save_m2m()
+            messages.success(request, f'Группа "{group.name}" успешно создана!')
+            return redirect('group_detail', pk=group.pk)
+    else:
+        form = StudentGroupForm(teacher_profile=teacher_profile)
+
+    return render(request, 'group_form.html', {
+        'form': form,
+        'title': 'Создание группы'
+    })
+
+
+@login_required
+def group_edit_view(request, pk):
+    """Редактирование существующей группы"""
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    group = get_object_or_404(StudentGroup, pk=pk, teacher=teacher_profile)
+
+    if request.method == 'POST':
+        form = StudentGroupForm(request.POST, instance=group, teacher_profile=teacher_profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Группа "{group.name}" обновлена.')
+            return redirect('group_detail', pk=group.pk)
+    else:
+        form = StudentGroupForm(instance=group, teacher_profile=teacher_profile)
+
+    return render(request, 'group_form.html', {
+        'form': form,
+        'group': group,
+        'title': f'Редактирование: {group.name}'
+    })
+
+
+@login_required
+def group_detail_view(request, pk):
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        raise PermissionDenied("Доступ разрешен только преподавателям.")
+
+    group = get_object_or_404(
+        StudentGroup.objects.prefetch_related('students__user', 'students__school_class'),
+        pk=pk,
+        teacher=teacher_profile
+    )
+
+    grouped_homeworks = get_grouped_homeworks_for_group(group)
+
+    # Проверяем, откуда пришел пользователь
+    from_param = request.GET.get('from')
+    if from_param == 'schedule':
+        back_url = reverse('schedule:list')
+        back_label = 'Назад к расписанию'
+    else:
+        back_url = f"{reverse('teacher_dashboard')}#groups"  # или URL списка групп
+        back_label = 'Назад к списку групп'
+
+    context = {
+        'group': group,
+        'grouped_homeworks': grouped_homeworks,
+        'back_url': back_url,
+        'back_label': back_label,
+    }
+
+    return render(request, 'group_detail.html', context)
+
+
+@login_required
+def complete_group_view(request, pk):
+    """Перевод группы в статус 'Обучение завершено'"""
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        return redirect('home')
+
+    group = get_object_or_404(StudentGroup, pk=pk, teacher=teacher_profile)
+
+    if request.method == 'POST':
+        group.status = 'completed'
+        group.save()
+        messages.success(request, f'Группа "{group.name}" переведена в статус "Обучение завершено".')
+
+    return redirect(f"{request.META.get('HTTP_REFERER', '/')}#groups")
+
+
+def get_grouped_homeworks_for_group(group):
+    """
+    Получает все домашние задания группы и группирует их по единым выданным таскам.
+    """
+    homeworks = (
+        models.Homework.objects
+        .filter(group=group)
+        .select_related('subject', 'student__user')
+        .order_by('-created_at')
+    )
+
+    grouped_homeworks = defaultdict(list)
+
+    for hw in homeworks:
+        group_key = (
+            hw.title,
+            hw.subject.name if hw.subject else '—',
+            hw.hw_type,
+            hw.get_hw_type_display(),
+            hw.deadline,
+        )
+        grouped_homeworks[group_key].append(hw)
+
+    return dict(grouped_homeworks)

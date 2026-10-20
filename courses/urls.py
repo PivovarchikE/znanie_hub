@@ -56,4 +56,10 @@ urlpatterns = [
 
     # Поиск
     path('search/', courses_views.global_search_view, name='global_search'),
+
+    # Группы
+    path('groups/<int:group_id>/add-homework/', courses_views.group_add_hw_view, name='group_add_hw'),
+    path('groups/<int:group_id>/hw/<int:homework_id>/edit/', courses_views.group_edit_hw_view, name='group_edit_hw'),
+    path('groups/<int:group_id>/hw/<int:homework_id>/delete/', courses_views.group_delete_hw_view, name='group_delete_hw'),
+
 ]

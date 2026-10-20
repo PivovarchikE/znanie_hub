@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm, inlineformset_factory, Select, TextInput, Textarea, DateTimeInput, FileInput, \
-    CheckboxInput
+    CheckboxInput, ClearableFileInput, FileField, ModelChoiceField
+
+from users.models import StudentGroup
 from .models import Homework, HomeworkFile, SimulatorConfig, Section, Topic
 
 
@@ -85,3 +87,39 @@ HomeworkFileFormSet = inlineformset_factory(
     can_delete=True,
     widgets={'file': FileInput(attrs={'class': 'form-control'})}
 )
+
+
+class GroupHomeworkForm(HomeworkForm):
+    class Meta(HomeworkForm.Meta):
+        fields = ['subject', 'section', 'topic', 'hw_type', 'title', 'content', 'deadline']
+
+    def __init__(self, *args, **kwargs):
+        # Вызываем __init__ базового ModelForm, минуя HomeworkForm.__init__
+        super(HomeworkForm, self).__init__(*args, **kwargs)
+
+        # Начальные пустые QuerySet только для полей, присутствующих в Meta.fields
+        self.fields['section'].queryset = Section.objects.none()
+        self.fields['topic'].queryset = Topic.objects.none()
+
+        data = args[0] if args and args[0] else None
+        instance = kwargs.get('instance')
+
+        if data:
+            self._set_dynamic_quarters(
+                subject_id=data.get('subject'),
+                section_id=data.get('section'),
+                topic_id=data.get('topic')
+            )
+        elif instance and instance.pk:
+            self._set_dynamic_quarters(
+                subject_id=instance.subject_id,
+                section_id=instance.section_id,
+                topic_id=instance.topic_id
+            )
+
+    def _set_dynamic_quarters(self, subject_id=None, section_id=None, topic_id=None):
+        """Динамическое наполнение разделов и тем (без simulator_config)"""
+        if subject_id:
+            self.fields['section'].queryset = Section.objects.filter(subject_id=subject_id)
+        if section_id:
+            self.fields['topic'].queryset = Topic.objects.filter(section_id=section_id)

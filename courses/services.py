@@ -1,5 +1,9 @@
 import random
 
+from django.db import transaction
+
+from courses.models import Homework, HomeworkFile
+
 
 def generate_math_tasks_addition_and_substraction(config_params):
     """
@@ -28,3 +32,23 @@ def generate_math_tasks_addition_and_substraction(config_params):
             "answer": str(answer)
         })
     return problems
+
+
+@transaction.atomic
+def assign_homework_to_group(teacher_profile, group, homework_data, files=None):
+    students = group.students.all()
+    created_homeworks = []
+
+    for student in students:
+        hw = Homework.objects.create(
+            teacher=teacher_profile,
+            student=student,
+            group=group,
+            **homework_data
+        )
+        if files:
+            for f in files:
+                HomeworkFile.objects.create(homework=hw, file=f)
+        created_homeworks.append(hw)
+
+    return created_homeworks

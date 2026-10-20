@@ -13,12 +13,12 @@ from django.contrib.auth.forms import logger
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from courses.forms import HomeworkForm, HomeworkFileFormSet
+from courses.forms import HomeworkForm, HomeworkFileFormSet, GroupHomeworkForm
 from courses.models import Subject, Topic, TrainingSession, SimulatorConfig, Homework, Section, HomeworkResponseFile, \
-    HomeworkComment
+    HomeworkComment, HomeworkFile
 from courses.services import generate_math_tasks_addition_and_substraction
 from decorators import ajax_required
-from users import models
+from users.models import StudentGroup
 from users.forms import StudentProfileForm, StudentEditForm, PhoneFormSet
 from users.models import StudentProfile, TeacherProfile
 
@@ -280,7 +280,9 @@ def teacher_dashboard_view(request):
     # Получаем профиль учителя и его учеников
     teacher_profile = request.user.teacher_profile
     students = teacher_profile.my_students.filter(deleted_at__isnull=True).select_related('user', 'school_class')
+    groups = StudentGroup.objects.filter(teacher=teacher_profile)
     return render(request, 'dashboard_teacher_index.html', {
+        'groups': groups,
         'students': students,
     })
 
@@ -485,7 +487,7 @@ def grade_homework(request, hw_id):
         if action == 'accept':
             if not score:
                 messages.error(request, "Необходимо выставить балл для принятия работы.")
-                return redirect('...')
+                return redirect('homework_view_detail', hw_id=hw_id)
             homework.status = 'completed'
             homework.is_completed = True
             homework.actual_score = score
@@ -671,3 +673,311 @@ def global_search_view(request):
         return render(request, 'search_full_results.html', context)
     except:
         return render(request, 'partials/search_dropdown.html', context)
+
+@login_required
+def search_students_and_groups_api(request):
+    """Эндпоинт для автокомплита в календаре / при назначении ДЗ"""
+    query = request.GET.get('q', '').strip()
+    teacher = request.user.teacher_profile
+
+    students = StudentProfile.objects.filter(teachers=teacher)
+    groups = StudentGroup.objects.filter(teacher=teacher, is_active=True)
+
+    if query:
+        students = students.filter(
+            Q(user__first_name__icontains=query) |
+            Q(user__last_name__icontains=query) |
+            Q(user__username__icontains=query)
+        )
+        groups = groups.filter(name__icontains=query)
+
+    data = {
+        'students': [
+            {'id': s.id, 'name': s.user.get_full_name() or s.user.username, 'class': str(s.school_class)}
+            for s in students[:10]
+        ],
+        'groups': [
+            {'id': g.id, 'name': g.name, 'students_count': g.students.count()}
+            for g in groups[:10]
+        ]
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def group_add_hw_view(request, group_id):
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        messages.error(request, "Доступ разрешен только преподавателям.")
+        return redirect('teacher_dashboard')
+
+    group = get_object_or_404(StudentGroup, pk=group_id, teacher=teacher_profile)
+
+    if group.status != 'active':
+        messages.warning(request, "Нельзя назначать ДЗ группе со статусом «Обучение завершено».")
+        return redirect('group_detail', pk=group.pk)
+
+    all_students = group.students.all()
+    if not all_students.exists():
+        messages.warning(request, f'В группе "{group.name}" нет учеников.')
+        return redirect('group_detail', pk=group.pk)
+
+    if request.method == 'POST':
+        form = HomeworkForm(request.POST)
+
+        # 1. Получаем выбранные ID учеников из чекбоксов
+        selected_student_ids = [int(sid) for sid in request.POST.getlist('selected_students') if sid.isdigit()]
+        target_students = all_students.filter(id__in=selected_student_ids)
+
+        # Валидация: должен быть выбран хотя бы один ученик
+        if not selected_student_ids:
+            messages.error(request, "Выберите хотя бы одного ученика для назначения домашнего задания.")
+
+        # Динамически расширяем queryset для topic и section при POST
+        topic_id = request.POST.get('topic')
+        section_id = request.POST.get('section')
+
+        if topic_id:
+            form.fields['topic'].queryset = Topic.objects.filter(pk=topic_id)
+        if section_id:
+            form.fields['section'].queryset = Section.objects.filter(pk=section_id)
+
+        formset = HomeworkFileFormSet(request.POST, request.FILES, prefix='files')
+
+        if selected_student_ids and form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                created_homeworks = []
+                for student in target_students:
+                    hw = Homework(
+                        subject=form.cleaned_data.get('subject'),
+                        section=form.cleaned_data.get('section'),
+                        topic=form.cleaned_data.get('topic'),
+                        hw_type=form.cleaned_data.get('hw_type'),
+                        title=form.cleaned_data.get('title'),
+                        content=form.cleaned_data.get('content'),
+                        simulator_config=form.cleaned_data.get('simulator_config'),
+                        deadline=form.cleaned_data.get('deadline'),
+                        include_site_theory=form.cleaned_data.get('include_site_theory', False),
+                        teacher=teacher_profile,
+                        student=student,
+                        group=group,
+                        status='pending'
+                    )
+                    created_homeworks.append(hw)
+
+                created_homeworks = Homework.objects.bulk_create(created_homeworks)
+
+                files_to_save = [
+                    f.cleaned_data.get('file')
+                    for f in formset.forms
+                    if f.cleaned_data and f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False)
+                ]
+
+                if files_to_save and created_homeworks:
+                    for uploaded_file in files_to_save:
+                        first_file = HomeworkFile.objects.create(
+                            homework=created_homeworks[0],
+                            file=uploaded_file,
+                            original_name=uploaded_file.name
+                        )
+                        shared_files = [
+                            HomeworkFile(
+                                homework=hw,
+                                file=first_file.file.name,
+                                original_name=uploaded_file.name
+                            )
+                            for hw in created_homeworks[1:]
+                        ]
+                        HomeworkFile.objects.bulk_create(shared_files)
+
+            messages.success(request,
+                             f'Домашнее задание успешно назначено {len(created_homeworks)} ученикам группы "{group.name}"!')
+            return redirect('group_detail', pk=group.pk)
+        else:
+            if form.is_valid() and formset.is_valid() and not selected_student_ids:
+                pass  # Ошибка уже выведена выше через messages.error
+            else:
+                messages.error(request, "Пожалуйста, исправьте ошибки в форме.")
+    else:
+        form = HomeworkForm()
+        formset = HomeworkFileFormSet(prefix='files')
+        # По умолчанию выбираем всех учеников группы
+        selected_student_ids = list(all_students.values_list('id', flat=True))
+
+    return render(request, 'group_add_hw.html', {
+        'form': form,
+        'formset': formset,
+        'group': group,
+        'selected_student_ids': selected_student_ids,
+    })
+
+
+@login_required
+def group_edit_hw_view(request, group_id, homework_id):
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        messages.error(request, "Доступ разрешен только преподавателям.")
+        return redirect('teacher_dashboard')
+
+    group = get_object_or_404(StudentGroup, pk=group_id, teacher=teacher_profile)
+    all_students = group.students.all()
+
+    # Находим базовое ДЗ
+    base_hw = get_object_or_404(Homework, pk=homework_id, group=group, teacher=teacher_profile)
+
+    # Находим ВСЕ ДЗ учеников этой группы с таким же заголовком и предметом
+    group_homeworks = Homework.objects.filter(
+        group=group,
+        teacher=teacher_profile,
+        title=base_hw.title,
+        subject=base_hw.subject
+    )
+    if not group_homeworks.exists():
+        group_homeworks = Homework.objects.filter(pk=base_hw.pk)
+
+    if request.method == 'POST':
+        form = HomeworkForm(request.POST, instance=base_hw)
+
+        # ID выбранных учеников из чекбоксов
+        selected_student_ids = [int(sid) for sid in request.POST.getlist('selected_students') if sid.isdigit()]
+
+        if not selected_student_ids:
+            messages.error(request, "Выберите хотя бы одного ученика.")
+
+        # Расширяем queryset для dynamic AJAX validation
+        topic_id = request.POST.get('topic')
+        section_id = request.POST.get('section')
+
+        if topic_id:
+            form.fields['topic'].queryset = Topic.objects.filter(pk=topic_id)
+        if section_id:
+            form.fields['section'].queryset = Section.objects.filter(pk=section_id)
+
+        formset = HomeworkFileFormSet(request.POST, request.FILES, instance=base_hw, prefix='files')
+
+        if selected_student_ids and form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                updated_fields = {
+                    'subject': form.cleaned_data.get('subject'),
+                    'section': form.cleaned_data.get('section'),
+                    'topic': form.cleaned_data.get('topic'),
+                    'hw_type': form.cleaned_data.get('hw_type'),
+                    'title': form.cleaned_data.get('title'),
+                    'content': form.cleaned_data.get('content'),
+                    'simulator_config': form.cleaned_data.get('simulator_config'),
+                    'deadline': form.cleaned_data.get('deadline'),
+                    'include_site_theory': form.cleaned_data.get('include_site_theory', False),
+                }
+
+                # 1. Удаляем ДЗ у учеников, с которых СНЯЛИ галочку
+                removed_homeworks = group_homeworks.exclude(student_id__in=selected_student_ids)
+                if removed_homeworks.exists():
+                    HomeworkFile.objects.filter(homework__in=removed_homeworks).delete()
+                    removed_homeworks.delete()
+
+                # 2. Обновляем существующие записи у тех, кто остался выбран
+                remaining_homeworks = group_homeworks.filter(student_id__in=selected_student_ids)
+                remaining_homeworks.update(**updated_fields)
+
+                # 3. Сохраняем изменения файлов в base_hw
+                formset.save()
+
+                # 4. Находим учеников, у которых ЕЩЕ НЕТ этого ДЗ, и создаем для них
+                assigned_student_ids = set(remaining_homeworks.values_list('student_id', flat=True))
+                new_student_ids = set(selected_student_ids) - assigned_student_ids
+
+                if new_student_ids:
+                    new_students = all_students.filter(id__in=new_student_ids)
+                    new_hws = []
+                    for st in new_students:
+                        new_hws.append(Homework(
+                            teacher=teacher_profile,
+                            student=st,
+                            group=group,
+                            created_at=base_hw.created_at,
+                            status='pending',
+                            **updated_fields
+                        ))
+                    Homework.objects.bulk_create(new_hws)
+
+                # 5. Синхронизируем прикрепленные файлы со ВСЕМИ текущими ДЗ группы
+                all_current_homeworks = Homework.objects.filter(
+                    group=group,
+                    teacher=teacher_profile,
+                    title=form.cleaned_data.get('title'),
+                    subject=form.cleaned_data.get('subject')
+                )
+                other_homeworks = all_current_homeworks.exclude(pk=base_hw.pk)
+
+                if other_homeworks.exists():
+                    base_files = HomeworkFile.objects.filter(homework=base_hw)
+                    HomeworkFile.objects.filter(homework__in=other_homeworks).delete()
+
+                    new_shared_files = []
+                    for hw in other_homeworks:
+                        for b_file in base_files:
+                            new_shared_files.append(
+                                HomeworkFile(
+                                    homework=hw,
+                                    file=b_file.file.name,
+                                    original_name=b_file.original_name
+                                )
+                            )
+                    if new_shared_files:
+                        HomeworkFile.objects.bulk_create(new_shared_files)
+
+            messages.success(request, f'Домашнее задание для группы "{group.name}" успешно обновлено!')
+            return redirect('group_detail', pk=group.pk)
+        else:
+            if form.is_valid() and formset.is_valid() and not selected_student_ids:
+                pass
+            else:
+                messages.error(request, "Пожалуйста, исправьте ошибки в форме.")
+    else:
+        # GET-запрос
+        initial_data = {}
+        if base_hw.topic:
+            initial_data['subject'] = base_hw.topic.section.subject.id
+            initial_data['section'] = base_hw.topic.section.id
+            initial_data['topic'] = base_hw.topic.id
+
+        form = HomeworkForm(instance=base_hw, initial=initial_data)
+
+        subject_id = base_hw.topic.section.subject.id if base_hw.topic else (
+            base_hw.section.subject.id if base_hw.section else None)
+        if subject_id:
+            form.fields['section'].queryset = Section.objects.filter(subject_id=subject_id)
+        if base_hw.section_id:
+            form.fields['topic'].queryset = Topic.objects.filter(section_id=base_hw.section_id)
+
+        formset = HomeworkFileFormSet(instance=base_hw, prefix='files')
+
+        # Получаем точный список ID всех учеников, у которых в этой группе сейчас создано это ДЗ
+        selected_student_ids = list(group_homeworks.values_list('student_id', flat=True))
+
+    return render(request, 'group_add_hw.html', {
+        'form': form,
+        'formset': formset,
+        'group': group,
+        'is_edit': True,
+        'homework': base_hw,
+        'selected_student_ids': selected_student_ids,
+    })
+
+@login_required
+@require_POST
+def group_delete_hw_view(request, group_id, homework_id):
+    group = get_object_or_404(StudentGroup, id=group_id)
+    target_hw = get_object_or_404(Homework, id=homework_id)
+
+    # Находим и удаляем все записи ДЗ с таким же названием и предметом для данной группы
+    # (если ДЗ создавалось пакетом на всех учеников)
+    deleted_count, _ = Homework.objects.filter(
+        student__in=group.students.all(),
+        title=target_hw.title,
+        subject=target_hw.subject,
+        hw_type=target_hw.hw_type
+    ).delete()
+
+    messages.success(request, f'Домашнее задание "{target_hw.title}" успешно удалено для всех учеников группы.')
+    return redirect('group_detail', pk=group.pk)

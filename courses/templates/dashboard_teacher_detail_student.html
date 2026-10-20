@@ -13,6 +13,12 @@
         </ol>
     </nav>
 
+    <div class="mb-3">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body d-flex justify-content-between align-items-center">
             <div>
@@ -107,66 +113,86 @@
                         </td>
                         <td><strong>{{ hw.title }}</strong></td>
                         <td class="text-nowrap">{{ hw.deadline|date:"d.m.Y H:i"|default:"—" }}</td>
-                        <td>
-                            {% if hw.is_completed %}
-                                {# ЗАВЕРШЕННЫЕ ЗАДАНИЯ #}
-                                <span class="text-success fw-bold">
-                                    <i class="bi bi-check-square-fill"></i>
-                                    {% if hw.hw_type == 'simulator' %}
-                                        {{ hw.score }}%
-                                    {% elif hw.hw_type == 'practice' %}
-                                        {{ hw.actual_score|default:"10" }}/10
-                                    {% else %}
-                                        Изучено
-                                    {% endif %}
+                    <td class="text-center">
+                        {% if hw.is_completed %}
+                            {# ЗАВЕРШЕННЫЕ ЗАДАНИЯ #}
+                            <span class="badge bg-success px-2 py-1">
+                                <i class="bi bi-check-circle-fill me-1"></i>
+                                {% if hw.hw_type == 'simulator' %}
+                                    {{ hw.score|default:"0" }}%
+                                {% elif hw.hw_type == 'practice' %}Принято
+                                            {% if hw.hw_type == 'simulator' and hw.score is not None %}
+                                                ({{ hw.score }}%)
+                                            {% elif hw.actual_score is not None %}
+                                                ({{ hw.actual_score }}/{{ hw.score|default:"10" }})
+                                            {% endif %}
+
+                                {% else %}
+                                    Изучено
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            {# ЗАДАНИЯ В ПРОЦЕССЕ #}
+                            {% if hw.status == 'review' or hw.status == 'checking' %}
+                                <span class="badge bg-info text-dark px-2 py-1">
+                                    <i class="bi bi-eye-fill me-1"></i>На проверке
+                                </span>
+                            {% elif hw.status == 'correction' or hw.status == 'fix' %}
+                                <span class="badge bg-warning text-dark px-2 py-1">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>На доработке
+                                </span>
+                            {% elif hw.is_overdue %}
+                                <span class="badge bg-danger px-2 py-1">
+                                    <i class="bi bi-clock-history me-1"></i>Просрочено
                                 </span>
                             {% else %}
-                                {# ЗАДАНИЯ В ПРОЦЕССЕ #}
-                                {% if hw.status == 'review' %}
-                                    <span class="badge bg-info text-dark">
-                                        <i class="bi bi-eye-fill"></i> На проверке
-                                    </span>
-                                {% elif hw.status == 'correction' %}
-                                    <span class="badge bg-warning text-dark">
-                                        <i class="bi bi-exclamation-triangle-fill"></i> На доработке
-                                    </span>
-                                {% else %}
-                                    {# Статус pending или если status еще не заполнен #}
-                                    <span class="text-muted text-nowrap">
-                                        <i class="bi bi-clock-history"></i>
-                                        {% if hw.hw_type == 'simulator' %}Не выполнено{% else %}Не прочитано{% endif %}
-                                    </span>
-                                {% endif %}
+                                <span class="badge bg-secondary px-2 py-1">
+                                    <i class="bi bi-clock-history me-1"></i>
+                                    {% if hw.hw_type == 'simulator' %}Ждет решения{% elif hw.hw_type == 'practice' %}Ждет решения{% else %}Ждет изучения{% endif %}
+                                </span>
                             {% endif %}
-                        </td>
+                        {% endif %}
+                    </td>
                         <td class="text-end text-nowrap">
-                            <div class="d-flex justify-content-end align-items-center">
-                                {# 1. Детализация (график) #}
+                            <div class="actions-grid ms-auto">
+                                {# 1. Детализация (для тренажера) #}
                                 {% if hw.hw_type == 'simulator' and hw.is_completed %}
-                                    <button class="btn btn-link text-info p-0 me-2"
+                                    <button class="btn btn-link text-info p-0"
                                             onclick="showHwDetails('{{ hw.id }}')"
                                             title="Посмотреть детализацию">
                                         <i class="bi bi-bar-chart-line"></i>
                                     </button>
+                                {% else %}
+                                    <div></div> {# Пустое место, если не тренажер или не завершено #}
                                 {% endif %}
 
-                                {# 2. Редактировать #}
-                                {% if not hw.is_completed %}
-                                    <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 me-2" title="Редактировать"><i class="bi bi-pencil-square"></i></a>
+                                {# 2. Просмотр / Проверка (есть у всех) #}
+                                <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 text-secondary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+
+                                {# 3. Редактировать (только если не групповое и не завершено) #}
+                                {% if not hw.group and not hw.is_completed %}
+                                    <a href="{% url 'edit_homework' hw.id %}" class="btn btn-link p-0 text-primary" title="Редактировать">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                {% else %}
+                                    <div></div> {# Пустое место при отсутствии кнопки #}
                                 {% endif %}
 
-                                {# 3. Просмотр #}
-                                <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-link p-0 me-2" title="Просмотр"><i class="bi bi-eye"></i></a>
-
-                                {# 4. Удаление (форма) #}
-                                <form action="{% url 'delete_homework' hw.id %}" method="post"
-                                      onsubmit="return confirm('Вы уверены, что хотите удалить это задание?');"
-                                      class="d-inline p-0 m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-link text-danger p-0" title="Удалить">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                {# 4. Удаление (только если не групповое) #}
+                                {% if not hw.group %}
+                                    <form action="{% url 'delete_homework' hw.id %}" method="post"
+                                          onsubmit="return confirm('Вы уверены, что хотите удалить это задание?');"
+                                          class="d-inline p-0 m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-link text-danger p-0" title="Удалить">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <div></div> {# Пустое место при отсутствии кнопки #}
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -264,5 +290,16 @@ function showHwDetails(hwId) {
             });
 }
 </script>
+
+<style>
+/* Сетка на 4 строго фиксированные колонки */
+    .actions-grid {
+        display: inline-grid;
+        grid-template-columns: repeat(4, 28px); /* 4 колонки по 28px */
+        align-items: center;
+        justify-items: center;
+        width: fit-content;
+    }
+</style>
 
 {% endblock %}
