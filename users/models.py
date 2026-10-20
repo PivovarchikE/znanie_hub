@@ -98,6 +98,13 @@ class User(AbstractUser, BaseModel):
         verbose_name="Аватар"
     )
 
+    @property
+    def avatar_url(self):
+        """Возвращает URL аватарки, если файл существует, иначе None."""
+        if self.avatar and hasattr(self.avatar, 'url'):
+            return self.avatar.url
+        return None
+
     def clean(self):
         super().clean()
         if self.date_of_birth and self.date_of_birth > date.today():
@@ -252,3 +259,22 @@ class UserPhoneNumber(BaseModel):
         if self.owner_name:
             return f"{self.number} ({self.owner_name} - {self.get_relationship_display()})"
         return f"{self.number} (Личный)"
+
+class StudentGroup(BaseModel):
+    STATUS_CHOICES = [
+        ('active', 'Активна'),
+        ('completed', 'Обучение завершено'),
+    ]
+
+    name = models.CharField(max_length=255, verbose_name="Название группы")
+    teacher = models.ForeignKey('TeacherProfile', on_delete=models.CASCADE, related_name='student_groups')
+    students = models.ManyToManyField('StudentProfile', related_name='student_groups', blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='active',
+        verbose_name="Статус"
+    )
+
+    def __str__(self):
+        return self.name

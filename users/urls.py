@@ -35,4 +35,10 @@ urlpatterns = [
     path('profile_edit/', users_views.profile_edit_view, name='profile_edit'),
     path('profile/avatar/', users_views.avatar_update_view, name='avatar_update'),
     path('profile/password/', users_views.UserPasswordChangeView.as_view(), name='password_change'),
+
+    # groups
+    path('groups/create/', users_views.group_create_view, name='group_create'),
+    path('groups/<int:pk>/', users_views.group_detail_view, name='group_detail'),
+    path('groups/<int:pk>/edit/', users_views.group_edit_view, name='group_edit'),
+    path('groups/<int:pk>/complete/', users_views.complete_group_view, name='complete_group'),
 ]

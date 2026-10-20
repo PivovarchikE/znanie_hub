@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Кнопка возврата -->
+    <div class="mb-3">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold m-0">Группа: {{ group.name }}</h2>
+        {% if group.status == 'active' %}
+            <a href="{% url 'group_add_hw' group.id %}" class="btn btn-success shadow-sm">
+                + Назначить ДЗ группе
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        <!-- Левая колонка: Состав группы -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light fw-bold">
+                    👥 Участники ({{ group.students.count }})
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for student in group.students.all %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{% url 'student_detail' student.id %}" class="fw-bold text-decoration-none">
+                                    {{ student.user.get_full_name|default:student.user.username }}
+                                </a>
+                                <div class="small text-muted">@{{ student.user.username }}</div>
+                            </div>
+                            <span class="badge bg-light text-dark border">{{ student.school_class.number }} кл</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center py-3">
+                            В группе пока нет учеников
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка: История ДЗ -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light fw-bold py-3">
+                    📚 Назначенные домашние задания
+                </div>
+                <div class="card-body p-3">
+    {% for meta, hw_list in grouped_homeworks.items %}
+        {# Структура meta ключа: #}
+        {# meta.0 = title #}
+        {# meta.1 = subject name #}
+        {# meta.2 = hw_type #}
+        {# meta.3 = hw_type_display #}
+        {# meta.4 = deadline #}
+
+        <!-- ЕДИНЫЙ БЛОК ДЛЯ ВСЕГО ГРУППОВОГО ЗАДАНИЯ -->
+        <div class="card mb-4 border-0 shadow-sm overflow-hidden border">
+
+            <!-- Шапка задания с фиксированным выравниванием элементов -->
+            <div class="card-header bg-light border-bottom p-3">
+                <div class="row align-items-center g-2">
+                    <!-- Левая часть: Название ДЗ и Метаинформация -->
+                    <div class="col-12 col-lg-7">
+                        <h5 class="fw-bold text-primary mb-1 text-truncate" title="{{ meta.0|default:'Без названия' }}">
+                            <i class="bi bi-journal-bookmark me-2"></i>{{ meta.0|default:"Без названия" }}
+                        </h5>
+                        <div class="small text-muted d-flex flex-wrap align-items-center gap-2 mt-1">
+                            <span class="text-nowrap"><i class="bi bi-book me-1"></i><strong>Предмет:</strong> {{ meta.1 }}</span>
+                            {% if hw_list.0.created_at %}
+                                <span class="text-black-50">•</span>
+                                <span class="text-nowrap"><i class="bi bi-calendar-event me-1"></i><strong>Назначено:</strong> {{ hw_list.0.created_at|date:"d.m.Y H:i" }}</span>
+                            {% endif %}
+                            {% if meta.4 %}
+                                <span class="text-black-50">•</span>
+                                <span class="text-nowrap"><i class="bi bi-alarm me-1"></i><strong>Срок:</strong> {{ meta.4|date:"d.m.Y H:i" }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Правая часть: Тип задания, Кол-во учеников, Кнопки -->
+                    <div class="col-12 col-lg-5 d-flex align-items-center justify-content-lg-end gap-2">
+                        <!-- Тип задания -->
+                        <div class="flex-shrink-0">
+                            {% if meta.2 == 'simulator' %}
+                                <span class="badge bg-info text-dark px-3 py-2"><i class="bi bi-cpu me-1"></i>Тренажер</span>
+                            {% elif meta.2 == 'practice' %}
+                                <span class="badge bg-primary px-3 py-2"><i class="bi bi-pencil-square me-1"></i>Практика</span>
+                            {% elif meta.2 == 'theory' %}
+                                <span class="badge bg-secondary px-3 py-2"><i class="bi bi-book me-1"></i>Теория</span>
+                            {% else %}
+                                <span class="badge bg-white text-dark border px-3 py-2">{{ meta.3|default:"Обычное" }}</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Кол-во учеников -->
+                        <div class="flex-shrink-0">
+                            <span class="badge bg-white text-dark border px-3 py-2">
+                                <i class="bi bi-people me-1"></i>Учеников: {{ hw_list|length }}
+                            </span>
+                        </div>
+
+                        <!-- Кнопки управления (Редактировать и Удалить) -->
+                        {% if hw_list.0.id %}
+                        <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
+                            <!-- Редактировать -->
+                            <a href="{% url 'group_edit_hw' group.id hw_list.0.id %}"
+                               class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0"
+                               style="width: 32px; height: 32px;"
+                               title="Редактировать ДЗ">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+
+                            <!-- Удалить -->
+                            <form action="{% url 'group_delete_hw' group.id hw_list.0.id %}"
+                                  method="post"
+                                  class="d-inline m-0"
+                                  onsubmit="return confirm('Вы уверены, что хотите удалить это домашнее задание для всей группы?');">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center p-0"
+                                        style="width: 32px; height: 32px;"
+                                        title="Удалить ДЗ">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таблица со списком учеников -->
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col" class="ps-3" style="width: 45%;">Ученик</th>
+                                <th scope="col" class="text-center" style="width: 35%;">Статус / Результат</th>
+                                <th scope="col" class="text-end pe-3" style="width: 20%;">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for hw in hw_list %}
+                            <tr>
+                                <!-- Ученик -->
+                                <td class="ps-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if hw.student.user.avatar_url %}
+                                            <img src="{{ hw.student.user.avatar_url }}"
+                                                 alt="{{ hw.student.user.full_name }}"
+                                                 class="rounded-circle object-fit-cover shadow-sm"
+                                                 style="width: 40px; height: 40px;">
+                                        {% else %}
+                                            <div class="rounded-circle bg-primary text-white fw-bold d-flex align-items-center justify-content-center shadow-sm"
+                                                 style="width: 40px; height: 40px; min-width: 40px; font-size: 1.1rem;">
+                                                {{ hw.student.user.last_name|default:hw.student.user.username|slice:":1"|upper }}
+                                            </div>
+                                        {% endif %}
+                                        <span class="fw-semibold text-dark">
+                                            {{ hw.student.user.full_name|default:hw.student.user.username }}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <!-- Статус -->
+                                <td class="text-center">
+                                    {% if hw.is_completed %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+                                            <i class="bi bi-check-circle-fill me-1"></i>
+                                            {% if hw.hw_type == 'simulator' %}
+                                                {{ hw.score|default:"0" }}%
+                                            {% elif hw.hw_type == 'practice' %}
+                                                Принято
+                                                {% if hw.actual_score is not None %}
+                                                    ({{ hw.actual_score }}/{{ hw.score|default:"10" }})
+                                                {% endif %}
+                                            {% else %}
+                                                Изучено
+                                            {% endif %}
+                                        </span>
+                                    {% else %}
+                                        {% if hw.status == 'review' or hw.status == 'checking' %}
+                                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-3 py-2">
+                                                <i class="bi bi-eye-fill me-1"></i>На проверке
+                                            </span>
+                                        {% elif hw.status == 'correction' or hw.status == 'fix' %}
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>На доработке
+                                            </span>
+                                        {% elif hw.is_overdue %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2">
+                                                <i class="bi bi-clock-history me-1"></i>Просрочено
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-light text-secondary border px-3 py-2">
+                                                <i class="bi bi-clock me-1"></i>
+                                                {% if hw.hw_type == 'simulator' or hw.hw_type == 'practice' %}Ждет решения{% else %}Ждет изучения{% endif %}
+                                            </span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+
+                                <!-- Действие -->
+                                <td class="text-end pe-3">
+                                    <a href="{% url 'homework_view_detail' hw.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square me-1"></i>Проверить
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    {% empty %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+            <p class="text-muted my-0">Этой группе еще не задавали домашних заданий</p>
+        </div>
+    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

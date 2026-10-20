@@ -4,6 +4,7 @@
 
 <!-- Безопасный проброс контекста из Django в Alpine.js без доп. API-запросов -->
 {{ students|json_script:"students-data" }}
+{{ groups|json_script:"groups-data" }}
 {{ subjects|json_script:"subjects-data" }}
 
 <style>
@@ -64,13 +65,41 @@
         </button>
       </div>
 
-      <!-- Выбор ученика -->
-      <select class="form-select form-select-sm shadow-sm rounded-3 style-select" x-model="selectedStudent" @change="fetchScheduleData()" style="width: auto;">
-        <option value="">Все ученики</option>
-        <template x-for="s in students" :key="s.id">
-          <option :value="s.id" x-text="s.name"></option>
-        </template>
-      </select>
+<!-- Выбор ученика или группы в панели управления -->
+<div class="d-flex align-items-center gap-1">
+  <select class="form-select form-select-sm shadow-sm rounded-3 style-select"
+          x-model="filterType"
+          @change="selectedStudent = ''; selectedGroup = ''; fetchScheduleData()"
+          style="width: auto;">
+    <option value="all">Все записи</option>
+    <option value="student">По ученику</option>
+    <option value="group">По группе</option>
+  </select>
+
+  <template x-if="filterType === 'student'">
+    <select class="form-select form-select-sm shadow-sm rounded-3 style-select"
+            x-model="selectedStudent"
+            @change="fetchScheduleData()"
+            style="width: auto;">
+      <option value="">Выберите ученика...</option>
+      <template x-for="s in students" :key="s.id">
+        <option :value="s.id" x-text="s.name"></option>
+      </template>
+    </select>
+  </template>
+
+  <template x-if="filterType === 'group'">
+    <select class="form-select form-select-sm shadow-sm rounded-3 style-select"
+            x-model="selectedGroup"
+            @change="fetchScheduleData()"
+            style="width: auto;">
+      <option value="">Выберите группу...</option>
+      <template x-for="g in groups" :key="g.id">
+        <option :value="g.id" x-text="g.name"></option>
+      </template>
+    </select>
+  </template>
+</div>
 
 <!-- 1. Выбор даты для режима НЕДЕЛЯ -->
       <template x-if="viewMode === 'week'">
@@ -196,17 +225,31 @@
                   </span>
                 </div>
 
-                <div class="d-flex align-items-center justify-content-between gap-1">
-                  <a
-                    :href="`{% url 'student_detail' 0 %}`.replace('0', lesson.student_id)"
-                    @click.stop
-                    class="fw-semibold text-truncate small text-primary text-decoration-none"
-                    x-text="lesson.student_name">
-                  </a>
-                  <template x-if="lesson.is_recurring">
-                    <span class="badge bg-info text-dark p-0 px-1 text-nowrap" title="Повторяющееся занятие" style="font-size: 10px;">🔄</span>
-                  </template>
-                </div>
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <!-- Групповой урок (ссылка на группу) -->
+                      <template x-if="lesson.group_id">
+                      <a :href="`{% url 'group_detail' 0 %}?from=schedule`.replace('0', lesson.group_id)"
+                         @click.stop
+                         class="fw-semibold text-truncate small text-primary text-decoration-none"
+                         title="Перейти к странице группы">
+                        <i class="bi bi-people-fill me-1"></i><span x-text="lesson.group_name"></span>
+                      </a>
+                      </template>
+
+                      <!-- Индивидуальный урок (ссылка на ученика с параметром ?from=schedule) -->
+                      <template x-if="!lesson.group_id">
+                        <a :href="`{% url 'student_detail' 0 %}?from=schedule`.replace('0', lesson.student_id)"
+                           @click.stop
+                           class="fw-semibold text-truncate small text-primary text-decoration-none"
+                           title="Перейти к странице ученика"
+                           x-text="lesson.student_name">
+                        </a>
+                      </template>
+
+                      <template x-if="lesson.is_recurring">
+                        <span class="badge bg-info text-dark p-0 px-1 text-nowrap" title="Повторяющееся занятие" style="font-size: 10px;">🔄</span>
+                      </template>
+                    </div>
 
                 <div class="text-muted text-truncate" style="font-size: 11px;"
                      x-text="(() => {
@@ -278,10 +321,30 @@
                   style="font-size: 10px; line-height: 1.2;"
                   :title="`${lesson.start_time}-${lesson.end_time}: ${lesson.student_name} (${lesson.subject_name}) — ${lesson.payment_status === 'PAID' ? 'Оплачено' : 'Не оплачено'}`">
 
-                  <div class="text-truncate me-1">
-                    <span class="font-monospace fw-bold" x-text="`${lesson.start_time}`"></span>
-                    <span class="fw-semibold ms-1" x-text="lesson.student_name"></span>
-                  </div>
+<div class="d-flex align-items-center justify-content-between gap-1">
+  <!-- Групповой урок (ссылка на группу) -->
+  <template x-if="lesson.group_id">
+    <a :href="`{% url 'group_detail' 0 %}`.replace('0', lesson.group_id)"
+       @click.stop
+       class="fw-semibold text-truncate small text-primary text-decoration-none"
+       title="Перейти к странице группы">
+      <i class="bi bi-people-fill me-1"></i><span x-text="lesson.group_name"></span>
+    </a>
+  </template>
+
+  <!-- Индивидуальный урок (ссылка на ученика) -->
+  <template x-if="!lesson.group_id">
+    <a :href="`{% url 'student_detail' 0 %}`.replace('0', lesson.student_id)"
+       @click.stop
+       class="fw-semibold text-truncate small text-primary text-decoration-none"
+       x-text="lesson.student_name">
+    </a>
+  </template>
+
+  <template x-if="lesson.is_recurring">
+    <span class="badge bg-info text-dark p-0 px-1 text-nowrap" title="Повторяющееся занятие" style="font-size: 10px;">🔄</span>
+  </template>
+</div>
 
                   <!-- ИНДИКАТОР ОПЛАТЫ -->
                   <template x-if="lesson.status !== 'CANCELED'">
@@ -351,146 +414,210 @@
         </div>
 
         <form @submit.prevent="submitForm()">
-          <div class="modal-body">
+  <div class="modal-body">
 
-            <template x-if="overlapWarning">
-              <div class="alert alert-warning border-warning rounded-3 mb-3 small d-flex flex-column gap-2" role="alert">
-                <span x-text="overlapWarning"></span>
-                <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" @click="confirmSave('this_only', true)">
-                  Всё равно сохранить
-                </button>
-              </div>
-            </template>
+    <template x-if="overlapWarning">
+      <div class="alert alert-warning border-warning rounded-3 mb-3 small d-flex flex-column gap-2" role="alert">
+        <span x-text="overlapWarning"></span>
+        <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" @click="confirmSave('this_only', true)">
+          Всё равно сохранить
+        </button>
+      </div>
+    </template>
 
-            <template x-if="students.length === 0 || subjects.length === 0">
-              <div class="alert alert-warning rounded-3 mb-3 small" role="alert">
-                <div class="fw-bold mb-1">Нельзя создать урок!</div>
-                <template x-if="students.length === 0">
-                  <div>• У вас нет привязанных учеников.</div>
-                </template>
-                <template x-if="subjects.length === 0">
-                  <div>• У вас нет созданных предметов.</div>
-                </template>
-              </div>
-            </template>
+    <template x-if="students.length === 0 || subjects.length === 0">
+      <div class="alert alert-warning rounded-3 mb-3 small" role="alert">
+        <div class="fw-bold mb-1">Нельзя создать урок!</div>
+        <template x-if="students.length === 0">
+          <div>• У вас нет привязанных учеников.</div>
+        </template>
+        <template x-if="subjects.length === 0">
+          <div>• У вас нет созданных предметов.</div>
+        </template>
+      </div>
+    </template>
 
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Ученик</label>
-                <select x-model="form.student_id" class="form-select" required :disabled="students.length === 0">
-                  <option value="" disabled>Выберите ученика...</option>
-                  <template x-for="student in students" :key="student.id">
-                    <option :value="String(student.id)" x-text="student.name"></option>
-                  </template>
-                </select>
-              </div>
+    <!-- Единая сетка полей модального окна -->
+    <div class="row g-3">
 
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Предмет</label>
-                <select x-model="form.subject_id" class="form-select" required :disabled="subjects.length === 0">
-                  <option value="" disabled>Выберите предмет...</option>
-                  <template x-for="subject in subjects" :key="subject.id">
-                    <option :value="String(subject.id)" x-text="subject.name"></option>
-                  </template>
-                </select>
-              </div>
+      <!-- Переключатель типа записи -->
+      <div class="col-12">
+        <div class="btn-group w-100" role="group">
+          <button type="button"
+                  class="btn btn-sm"
+                  :class="form.target_type === 'student' ? 'btn-primary' : 'btn-outline-primary'"
+                  @click="form.target_type = 'student'">
+            Индивидуальный урок
+          </button>
+          <button type="button"
+                  class="btn btn-sm"
+                  :class="form.target_type === 'group' ? 'btn-primary' : 'btn-outline-primary'"
+                  @click="form.target_type = 'group'">
+            Групповой урок
+          </button>
+        </div>
+      </div>
 
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Дата</label>
-                <input type="date" x-model="form.date" class="form-control" required @change="overlapWarning = null">
-              </div>
+      <!-- Вариант 1: Ученик (с поиском) -->
+      <div class="col-md-6" x-show="form.target_type === 'student'">
+        <label class="form-label small fw-semibold">Ученик</label>
+        <input type="text"
+               class="form-control form-control-sm mb-1"
+               placeholder="🔍 Поиск ученика..."
+               x-model="studentSearchQuery">
 
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Время начала</label>
-                <input type="time" class="form-control" x-model="form.start_time" step="900" required @change="syncEndTime()">
-              </div>
+        <select x-model="form.student_id" class="form-select" :required="form.target_type === 'student'" :disabled="students.length === 0">
+          <option value="" disabled>Выберите ученика...</option>
+          <template x-for="student in filteredStudents" :key="student.id">
+            <option :value="String(student.id)" x-text="student.name"></option>
+          </template>
+        </select>
+      </div>
 
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Время окончания</label>
-                <input type="time" class="form-control" x-model="form.end_time" step="900" required @change="overlapWarning = null">
-              </div>
+      <!-- Вариант 2: Группа (с поиском и кнопкой просмотра состава) -->
+      <div class="col-md-6" x-show="form.target_type === 'group'">
+        <label class="form-label small fw-semibold">Группа</label>
+        <input type="text"
+               class="form-control form-control-sm mb-1"
+               placeholder="🔍 Поиск группы..."
+               x-model="groupSearchQuery">
 
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Стоимость (BYN)</label>
-                <input type="text" x-model="form.price_input" class="form-control" placeholder="0.00" required>
-              </div>
+        <select x-model="form.group_id" class="form-select" :required="form.target_type === 'group'" :disabled="groups.length === 0">
+          <option value="" disabled>Выберите группу...</option>
+          <template x-for="group in filteredGroups" :key="group.id">
+            <option :value="String(group.id)" x-text="group.name"></option>
+          </template>
+        </select>
 
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Статус занятия</label>
-                <select x-model="form.status" class="form-select">
-                  <option value="SCHEDULED">Назначено</option>
-                  <option value="COMPLETED">Проведено</option>
-                  <option value="CANCELED">Отменено</option>
-                </select>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label small fw-semibold">Оплата</label>
-                <select x-model="form.payment_status" class="form-select">
-                  <option value="UNPAID">Не оплачено</option>
-                  <option value="PAID">Оплачено</option>
-                </select>
-              </div>
-
-              <div class="col-12">
-                <label class="form-label small fw-semibold">Тема занятия</label>
-                <input type="text" x-model="form.topic" class="form-control" placeholder="Например: Решение квадратных уравнений">
-              </div>
-
-              <div class="col-12 border-top pt-3 mt-2">
-                <div class="form-check form-switch mb-2">
-                  <input class="form-check-input" type="checkbox" x-model="form.is_recurring" id="isRecurringCheck">
-                  <label class="form-check-label fw-semibold" for="isRecurringCheck">Повторять урок (Серия)</label>
-                </div>
-
-                <div x-show="form.is_recurring" class="bg-light p-3 rounded-3 mt-2 border">
-                  <label class="form-label small fw-semibold mb-1">Дни недели повтора:</label>
-                  <div class="d-flex flex-wrap gap-2 mb-3">
-                    <template x-for="(dayName, dayIdx) in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']" :key="dayIdx">
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        :class="form.days_of_week.includes(dayIdx) ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="toggleDay(dayIdx)"
-                        x-text="dayName">
-                      </button>
-                    </template>
-                  </div>
-
-                  <div class="row align-items-center">
-                    <div class="col-auto">
-                      <label class="form-label small fw-semibold mb-0">Повторять вперед на:</label>
-                    </div>
-                    <div class="col-auto">
-                      <input type="number" class="form-control form-control-sm" style="width: 80px;" x-model.number="form.weeks_count" min="1" max="24">
-                    </div>
-                    <div class="col-auto">
-                      <span class="small text-muted">недель</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-          <div class="modal-footer border-0 pt-0">
-            <button type="button" class="btn btn-light" @click="closeModal()">Отмена</button>
-
-            <template x-if="form.id">
-              <button type="button" class="btn btn-outline-danger me-auto" @click="openDeleteDialog()">Удалить</button>
-            </template>
-
-            <button
-              type="submit"
-              class="btn btn-primary px-4"
-              :disabled="students.length === 0 || subjects.length === 0"
-            >
-              Сохранить
+        <!-- Кнопка показа состава группы -->
+        <template x-if="selectedGroupDetails">
+          <div class="mt-2">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary py-0 px-2 text-decoration-none"
+                    style="font-size: 11px;"
+                    @click="showGroupStudents = !showGroupStudents">
+              <span x-text="showGroupStudents ? '🙈 Скрыть состав' : '👥 Посмотреть состав группы'"></span>
             </button>
+
+            <div x-show="showGroupStudents" class="mt-2 p-2 bg-light rounded border small" x-cloak>
+              <div class="fw-bold mb-1 text-secondary" style="font-size: 11px;">
+                Состав группы (<span x-text="selectedGroupDetails.students.length"></span>):
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <template x-for="st in selectedGroupDetails.students" :key="st.id">
+                  <span class="badge bg-secondary-subtle text-dark border font-normal" style="font-size: 10px;" x-text="st.name"></span>
+                </template>
+              </div>
+            </div>
           </div>
-        </form>
+        </template>
+      </div>
+
+      <!-- Предмет -->
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Предмет</label>
+        <select x-model="form.subject_id" class="form-select" required :disabled="subjects.length === 0">
+          <option value="" disabled>Выберите предмет...</option>
+          <template x-for="subject in subjects" :key="subject.id">
+            <option :value="String(subject.id)" x-text="subject.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Дата</label>
+        <input type="date" x-model="form.date" class="form-control" required @change="overlapWarning = null">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Время начала</label>
+        <input type="time" class="form-control" x-model="form.start_time" step="900" required @change="syncEndTime()">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Время окончания</label>
+        <input type="time" class="form-control" x-model="form.end_time" step="900" required @change="overlapWarning = null">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Стоимость (BYN)</label>
+        <input type="text" x-model="form.price_input" class="form-control" placeholder="0.00" required>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Статус занятия</label>
+        <select x-model="form.status" class="form-select">
+          <option value="SCHEDULED">Назначено</option>
+          <option value="COMPLETED">Проведено</option>
+          <option value="CANCELED">Отменено</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Оплата</label>
+        <select x-model="form.payment_status" class="form-select">
+          <option value="UNPAID">Не оплачено</option>
+          <option value="PAID">Оплачено</option>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Тема занятия</label>
+        <input type="text" x-model="form.topic" class="form-control" placeholder="Например: Решение квадратных уравнений">
+      </div>
+
+      <div class="col-12 border-top pt-3 mt-2">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" x-model="form.is_recurring" id="isRecurringCheck">
+          <label class="form-check-label fw-semibold" for="isRecurringCheck">Повторять урок (Серия)</label>
+        </div>
+
+        <div x-show="form.is_recurring" class="bg-light p-3 rounded-3 mt-2 border">
+          <label class="form-label small fw-semibold mb-1">Дни недели повтора:</label>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <template x-for="(dayName, dayIdx) in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']" :key="dayIdx">
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="form.days_of_week.includes(dayIdx) ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="toggleDay(dayIdx)"
+                x-text="dayName">
+              </button>
+            </template>
+          </div>
+
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <label class="form-label small fw-semibold mb-0">Повторять вперед на:</label>
+            </div>
+            <div class="col-auto">
+              <input type="number" class="form-control form-control-sm" style="width: 80px;" x-model.number="form.weeks_count" min="1" max="24">
+            </div>
+            <div class="col-auto">
+              <span class="small text-muted">недель</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Стандартный футер модалки (кнопки снизу справа) -->
+  <div class="modal-footer border-0 pt-0">
+    <template x-if="form.id">
+      <button type="button" class="btn btn-outline-danger me-auto" @click="openDeleteDialog()">Удалить</button>
+    </template>
+
+    <button type="button" class="btn btn-light" @click="closeModal()">Отмена</button>
+
+    <button type="submit"
+            class="btn btn-primary px-4"
+            :disabled="students.length === 0 || subjects.length === 0">
+      Сохранить
+    </button>
+  </div>
+</form>
 
       </div>
     </div>
@@ -546,24 +673,33 @@ function scheduleApp() {
     isDeleteModalOpen: false,
     showEditModeModal: false,
     overlapWarning: null,
+
+    // Фильтрация в панели управления
+    filterType: 'all',
     selectedStudent: '',
+    selectedGroup: '',
+
     pickerDate: '',
     currentDate: new Date(),
     periodDisplayTitle: '',
     days: [],
     monthDays: [],
     students: [],
+    groups: [],
     subjects: [],
     rawLessons: [],
 
-    // Переменные для универсального селектора месяца и года (совместимого с ПК)
+    // Поиск и видимость состава группы в модальном окне
+    studentSearchQuery: '',
+    groupSearchQuery: '',
+    showGroupStudents: false,
+
     selectedMonth: new Date().getMonth(),
     selectedYear: new Date().getFullYear(),
     monthNames: [
       'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
       'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
     ],
-    // Диапазон лет (прошлый год, текущий и 3 года вперед)
     availableYears: Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i),
 
     stats: {
@@ -579,7 +715,9 @@ function scheduleApp() {
     form: {
       id: null,
       parent_lesson_id: null,
+      target_type: 'student',
       student_id: '',
+      group_id: '',
       subject_id: '',
       date: '',
       start_time: '12:00',
@@ -593,13 +731,41 @@ function scheduleApp() {
       weeks_count: 4
     },
 
+    // --- ВЫЧИСЛЯЕМЫЕ СВОЙСТВА ---
+
+    get filteredStudents() {
+      if (!this.studentSearchQuery) return this.students;
+      return this.students.filter(s =>
+        s.name.toLowerCase().includes(this.studentSearchQuery.toLowerCase())
+      );
+    },
+
+    get filteredGroups() {
+      if (!this.groupSearchQuery) return this.groups;
+      return this.groups.filter(g =>
+        g.name.toLowerCase().includes(this.groupSearchQuery.toLowerCase())
+      );
+    },
+
+    get selectedGroupDetails() {
+      if (!this.form.group_id) return null;
+      return this.groups.find(g => String(g.id) === String(this.form.group_id));
+    },
+
+    // --- ИНИЦИАЛИЗАЦИЯ ---
+
     init() {
       try {
         const studentsScript = document.getElementById('students-data');
+        const groupsScript = document.getElementById('groups-data');
         const subjectsScript = document.getElementById('subjects-data');
 
         if (studentsScript && studentsScript.textContent.trim()) {
           this.students = JSON.parse(studentsScript.textContent);
+        }
+
+        if (groupsScript && groupsScript.textContent.trim()) {
+          this.groups = JSON.parse(groupsScript.textContent);
         }
 
         if (subjectsScript && subjectsScript.textContent.trim()) {
@@ -613,14 +779,12 @@ function scheduleApp() {
       this.fetchScheduleData();
     },
 
-    // Синхронизация всех элементов управления (pickerDate, selectedMonth, selectedYear) с currentDate
     syncControlsWithCurrentDate() {
       this.pickerDate = this.formatDate(this.currentDate);
       this.selectedMonth = this.currentDate.getMonth();
       this.selectedYear = this.currentDate.getFullYear();
     },
 
-    // Смена режима отображения (Неделя / Месяц)
     setViewMode(mode) {
       this.viewMode = mode;
       this.syncControlsWithCurrentDate();
@@ -634,7 +798,6 @@ function scheduleApp() {
       return `${year}-${month}-${day}`;
     },
 
-    // Вычисление текстового заглавия текущего периода
     updatePeriodDisplayTitle(weekStartStr) {
       if (this.viewMode === 'month') {
         const monthName = this.currentDate.toLocaleDateString('ru-RU', { month: 'long' });
@@ -662,14 +825,12 @@ function scheduleApp() {
       }
     },
 
-    // Выбор месяца/года из селекторов в режиме Месяц
     onMonthYearChange() {
       this.currentDate = new Date(Number(this.selectedYear), Number(this.selectedMonth), 1);
       this.syncControlsWithCurrentDate();
       this.fetchScheduleData();
     },
 
-    // Обработка выбора даты из календаря в режиме Неделя
     onDatePickerChange() {
       if (!this.pickerDate) return;
       const [y, m, d] = this.pickerDate.split('-').map(Number);
@@ -683,8 +844,10 @@ function scheduleApp() {
       const baseUrl = "{% url 'schedule:api_get_week' %}";
       let url = `${baseUrl}?date=${dateStr}&view_type=${this.viewMode}`;
 
-      if (this.selectedStudent) {
+      if (this.filterType === 'student' && this.selectedStudent) {
         url += `&student_id=${this.selectedStudent}`;
+      } else if (this.filterType === 'group' && this.selectedGroup) {
+        url += `&group_id=${this.selectedGroup}`;
       }
 
       try {
@@ -750,19 +913,16 @@ function scheduleApp() {
 
       const grid = [];
 
-      // Заполнение предыдущего месяца
       for (let i = startDayOfWeek; i > 0; i--) {
         const prevDate = new Date(year, month, 1 - i);
         grid.push(this.createMonthDayObject(prevDate, false));
       }
 
-      // Дни текущего месяца
       for (let d = 1; d <= lastDayOfMonth.getDate(); d++) {
         const currDate = new Date(year, month, d);
         grid.push(this.createMonthDayObject(currDate, true));
       }
 
-      // Заполнение остатка последней недели
       const remainingSlots = (7 - (grid.length % 7)) % 7;
       for (let i = 1; i <= remainingSlots; i++) {
         const nextDate = new Date(year, month + 1, i);
@@ -821,6 +981,9 @@ function scheduleApp() {
 
     editLesson(lesson) {
       this.overlapWarning = null;
+      this.studentSearchQuery = '';
+      this.groupSearchQuery = '';
+      this.showGroupStudents = false;
 
       let dayIdx = 0;
       if (lesson.date) {
@@ -832,7 +995,9 @@ function scheduleApp() {
       this.form = {
         id: lesson.id,
         parent_lesson_id: lesson.parent_lesson_id || null,
-        student_id: String(lesson.student_id),
+        target_type: lesson.group_id ? 'group' : 'student',
+        student_id: lesson.student_id ? String(lesson.student_id) : '',
+        group_id: lesson.group_id ? String(lesson.group_id) : '',
         subject_id: String(lesson.subject_id),
         date: lesson.date,
         start_time: lesson.start_time,
@@ -850,11 +1015,17 @@ function scheduleApp() {
 
     resetForm() {
       this.overlapWarning = null;
+      this.studentSearchQuery = '';
+      this.groupSearchQuery = '';
+      this.showGroupStudents = false;
+
       const todayDate = new Date();
       this.form = {
         id: null,
         parent_lesson_id: null,
+        target_type: 'student',
         student_id: this.students.length > 0 ? String(this.students[0].id) : '',
+        group_id: this.groups.length > 0 ? String(this.groups[0].id) : '',
         subject_id: this.subjects.length > 0 ? String(this.subjects[0].id) : '',
         date: this.formatDate(todayDate),
         start_time: '12:00',
@@ -899,6 +1070,133 @@ function scheduleApp() {
       const normalized = String(val).replace(',', '.').trim();
       const parsed = parseFloat(normalized);
       return isNaN(parsed) ? 0 : parsed;
+    },
+
+    // --- ОБРАБОТКА СОХРАНЕНИЯ И УДАЛЕНИЯ ДАННЫХ ---
+
+    submitForm() {
+      if (this.form.id && this.form.is_recurring) {
+        this.showEditModeModal = true;
+      } else {
+        this.confirmSave('this_only');
+      }
+    },
+
+    async confirmSave(updateMode = 'this_only', forceSave = false) {
+      const getCookie = (name) => {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      };
+
+      const payload = {
+        id: this.form.id,
+        target_type: this.form.target_type,
+        student_id: this.form.target_type === 'student' ? this.form.student_id : null,
+        group_id: this.form.target_type === 'group' ? this.form.group_id : null,
+        subject_id: this.form.subject_id,
+        date: this.form.date,
+        start_time: this.form.start_time,
+        end_time: this.form.end_time,
+        price: this.parsePrice(this.form.price_input),
+        status: this.form.status,
+        payment_status: this.form.payment_status,
+        topic: this.form.topic,
+        is_recurring: this.form.is_recurring,
+        days_of_week: this.form.days_of_week,
+        weeks_count: this.form.weeks_count,
+        update_mode: updateMode,
+        force_save: forceSave
+      };
+
+      try {
+        const response = await fetch("{% url 'schedule:api_save_lesson' %}", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.warning_overlap && !forceSave) {
+          this.overlapWarning = result.message;
+          this.showEditModeModal = false;
+          return;
+        }
+
+        if (result.success) {
+          this.closeModal();
+          await this.fetchScheduleData();
+        } else {
+          alert(result.message || "Произошла ошибка при сохранении урока.");
+        }
+      } catch (err) {
+        console.error("Ошибка сохранения урока:", err);
+        alert("Не удалось связаться с сервером.");
+      }
+    },
+
+    openDeleteDialog() {
+      this.isDeleteModalOpen = true;
+    },
+
+    async confirmDelete(mode = 'this_only') {
+      if (!this.form.id) return;
+
+      const getCookie = (name) => {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      };
+
+      const url = `{% url 'schedule:api_delete_lesson' 0 %}`.replace('0', this.form.id);
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ mode: mode })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          this.isDeleteModalOpen = false;
+          this.closeModal();
+          await this.fetchScheduleData();
+        } else {
+          alert(result.message || "Ошибка при удалении урока.");
+        }
+      } catch (err) {
+        console.error("Ошибка при удалении урока:", err);
+        alert("Не удалось связаться с сервером.");
+      }
     }
   };
 }

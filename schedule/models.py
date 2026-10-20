@@ -6,14 +6,14 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from users.models import BaseModel, TeacherProfile, StudentProfile
+from users.models import BaseModel, TeacherProfile, StudentProfile, StudentGroup
 from courses.models import Subject
 
 
 class RecurringRule(BaseModel):
     """
     Правило повторяющихся занятий.
-    Хранит параметры генерации серии уроков.
+    Хранит параметры генерации серии уроков (индивидуальных или групповых).
     """
 
     class Frequency(models.TextChoices):
@@ -27,6 +27,15 @@ class RecurringRule(BaseModel):
     student = models.ForeignKey(
         StudentProfile,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='recurring_rules'
+    )
+    group = models.ForeignKey(
+        StudentGroup,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='recurring_rules'
     )
     subject = models.ForeignKey(
@@ -48,13 +57,21 @@ class RecurringRule(BaseModel):
     start_date = models.DateField("Дата первого урока")
     end_date = models.DateField("Дата окончания серии")
 
+    def clean(self):
+        super().clean()
+        if not self.student and not self.group:
+            raise ValidationError("Правило должно содержать либо ученика, либо группу.")
+        if self.student and self.group:
+            raise ValidationError("Правило не может быть одновременно индивидуальным и групповым.")
+
     def __str__(self):
-        return f"Правило повтора #{self.id} для {self.student.user.full_name}"
+        target = self.group.name if self.group else (self.student.user.full_name if self.student else "—")
+        return f"Правило повтора #{self.id} для {target}"
 
 
 class Lesson(BaseModel):
     """
-    Конкретное занятие в расписании.
+    Конкретное занятие в расписании (индивидуальное или групповое).
     """
 
     class Status(models.TextChoices):
@@ -75,8 +92,18 @@ class Lesson(BaseModel):
     student = models.ForeignKey(
         StudentProfile,
         on_delete=models.CASCADE,
+        null=True,               # <-- Добавлено null=True
+        blank=True,              # <-- Добавлено blank=True
         related_name='lessons',
         verbose_name="Ученик"
+    )
+    group = models.ForeignKey(
+        StudentGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lessons',
+        verbose_name="Группа"
     )
     subject = models.ForeignKey(
         Subject,
@@ -135,6 +162,7 @@ class Lesson(BaseModel):
         indexes = [
             models.Index(fields=['teacher', 'date']),
             models.Index(fields=['student', 'date']),
+            models.Index(fields=['group', 'date']),
         ]
 
     def clean(self):
@@ -142,8 +170,14 @@ class Lesson(BaseModel):
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             raise ValidationError({'end_time': "Время окончания должно быть позже времени начала."})
 
+        # Проверка привязки: либо ученик, либо группа
+        if not self.student and not self.group:
+            raise ValidationError("Занятие должно быть привязано либо к ученику, либо к группе.")
+        if self.student and self.group:
+            raise ValidationError("Занятие не может быть одновременно индивидуальным и групповым.")
+
     def save(self, *args, **kwargs):
-        # Автоматический расчет длительности перед сохранением
+        # Валидация перед сохранением
         self.full_clean()
 
         if self.start_time and self.end_time:
@@ -151,7 +185,6 @@ class Lesson(BaseModel):
             t_start = datetime.combine(dt_dummy, self.start_time)
             t_end = datetime.combine(dt_dummy, self.end_time)
 
-            # Если время окончания меньше или равно времени начала (ночной перенос)
             if t_end <= t_start:
                 t_end += timedelta(days=1)
 
