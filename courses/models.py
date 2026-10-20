@@ -129,6 +129,14 @@ class Homework(BaseModel):
     ]
 
     student = models.ForeignKey('users.StudentProfile', on_delete=models.CASCADE, related_name='homeworks')
+    group = models.ForeignKey(
+        'users.StudentGroup',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='homeworks',
+        verbose_name="Группа"
+    )
     teacher = models.ForeignKey('users.TeacherProfile', on_delete=models.CASCADE)
     subject = models.ForeignKey('courses.Subject', on_delete=models.CASCADE, null=True, verbose_name="Предмет")
     section = models.ForeignKey('courses.Section', on_delete=models.CASCADE, verbose_name="Раздел", null=True,

@@ -8,6 +8,6 @@ urlpatterns = [
 
     # API эндпоинты для Alpine.js
     path("api/get-week/", views.get_week_schedule_api, name="api_get_week"),
-    path("api/save/", views.save_lesson_api, name="api_save"),
-    path("api/delete/<int:lesson_id>/", views.delete_lesson_api, name="api_delete"),
+    path("api/save/", views.save_lesson_api, name="api_save_lesson"),
+    path("api/delete/<int:lesson_id>/", views.delete_lesson_api, name="api_delete_lesson"),
 ]

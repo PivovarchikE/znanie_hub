@@ -5,8 +5,7 @@ from django.forms import inlineformset_factory
 from django.forms.models import BaseInlineFormSet
 
 from courses.models import Subject
-from users.models import TeacherProfile, UserPhoneNumber, StudentProfile, SchoolClass
-
+from users.models import TeacherProfile, UserPhoneNumber, StudentProfile, SchoolClass, StudentGroup
 
 User = get_user_model()
 
@@ -317,3 +316,34 @@ class AvatarUpdateForm(forms.ModelForm):
         widgets = {
             'avatar': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
+
+class StudentGroupStudentChoiceField(forms.ModelMultipleChoiceField):
+    """Кастомное поле для красивого отображения учеников в списке чекбоксов"""
+    def label_from_instance(self, obj: StudentProfile):
+        full_name = obj.user.get_full_name() or obj.user.username
+        class_num = getattr(obj.school_class, 'number', '—')
+        return f"{full_name} ({class_num} класс) — @{obj.user.username}"
+
+
+class StudentGroupForm(forms.ModelForm):
+    students = StudentGroupStudentChoiceField(
+        queryset=StudentProfile.objects.none(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        required=False,
+        label="Добавить учеников"
+    )
+
+    class Meta:
+        model = StudentGroup
+        fields = ['name', 'students']  # Убрали is_active
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите название группы'}),
+        }
+
+    def __init__(self, *args, teacher_profile=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if teacher_profile:
+            # Оптимизируем выборку (select_related) для отображения имени и класса без лишних запросов к БД
+            self.fields['students'].queryset = StudentProfile.objects.filter(
+                teachers=teacher_profile
+            ).select_related('user', 'school_class')

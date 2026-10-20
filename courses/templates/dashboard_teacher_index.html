@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
 
-
 {% block hero %}
 <section class="main-banner d-flex align-items-end justify-content-end text-center text-white"
          style="
@@ -10,72 +9,191 @@
             background-position: center 60%;
             min-height: 500px;
         ">
-
     <div class="p-3">
         <small class="opacity-50">
-            Photo by <a
-                href="https://unsplash.com/@mccarthybeckan?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">McCarthy
-            Beckan</a>
-            on <a
-                href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+            Photo by <a href="https://unsplash.com/@mccarthybeckan?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">McCarthy Beckan</a>
+            on <a href="https://unsplash.com/photos/a-stack-of-books-and-a-calculator-on-a-yellow-background-7ub1eAqc2vw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
         </small>
-    </div>
     </div>
 </section>
 {% endblock hero %}
 
-
 {% block content %}
+<div class="container py-4">
 
+    <!-- Переключение вкладок: Ученики / Группы -->
+    <ul class="nav nav-tabs mb-4" id="teacherTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold" id="students-tab" data-bs-toggle="tab" data-bs-target="#students-pane" type="button" role="tab" aria-controls="students-pane" aria-selected="true">
+                👨‍🎓 Мои ученики
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-pane" type="button" role="tab" aria-controls="groups-pane" aria-selected="false">
+                👥 Группы учеников
+            </button>
+        </li>
+    </ul>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold">Мои ученики</h2>
-        <a href="{% url 'dynamic_register' 'student' %}" class="btn btn-success shadow-sm">
-            + Добавить ученика
-        </a>
-    </div>
+    <div class="tab-content" id="teacherTabContent">
 
+        <!-- ВКЛАДКА 1: Список учеников -->
+        <div class="tab-pane fade show active" id="students-pane" role="tabpanel" aria-labelledby="students-tab">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold m-0">Мои ученики</h2>
+                <a href="{% url 'dynamic_register' 'student' %}" class="btn btn-success shadow-sm">
+                    + Добавить ученика
+                </a>
+            </div>
 
-    <div class="card border-0 shadow-sm">
-        <table class="table align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Ученик</th>
-                    <th>Класс</th>
-                    <th class="text-center">Чат</th>
-                    <th class="text-center">Инфо</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for student in students %}
-                <tr>
-                    <td>
-                        <div class="fw-bold">{{ student.user.full_name }}</div>
-                        <div class="small text-muted">@{{ student.user.username }}</div>
-                    </td>
-                    <td>{{ student.school_class.number }} класс</td>
-                    <td class="text-center">
-                        <a href="#" class="btn btn-link position-relative">
-                            {% if student.has_unread %}
-                                <i class="bi bi-chat-dots-fill text-primary fs-4"></i> <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
-                            {% else %}
-                                <i class="bi bi-chat-left text-secondary fs-4"></i> {% endif %}
-                        </a>
-                    </td>
-                    <td class="text-center">
-                        <a href="{% url 'student_detail' student.id %}" class="btn btn-outline-secondary btn-sm">
-                             🔍 Детали
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="text-center py-5 text-muted">У вас пока нет учеников</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            <div class="card border-0 shadow-sm">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ученик</th>
+                            <th>Класс</th>
+                            <th>Группы</th>
+                            <th class="text-center">Чат</th>
+                            <th class="text-center">Инфо</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ student.user.full_name }}</div>
+                                <div class="small text-muted">@{{ student.user.username }}</div>
+                            </td>
+                            <td>{{ student.school_class.number }} класс</td>
+                            <td>
+                                {% for grp in student.student_groups.all %}
+                                    <a href="{% url 'group_detail' grp.id %}" class="badge bg-info text-dark text-decoration-none me-1">
+                                        {{ grp.name }}
+                                    </a>
+                                {% empty %}
+                                    <span class="text-muted small">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="text-center">
+                                <a href="#" class="btn btn-link position-relative">
+                                    {% if student.has_unread %}
+                                        <i class="bi bi-chat-dots-fill text-primary fs-4"></i>
+                                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                                    {% else %}
+                                        <i class="bi bi-chat-left text-secondary fs-4"></i>
+                                    {% endif %}
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'student_detail' student.id %}" class="btn btn-outline-secondary btn-sm">
+                                    🔍 Детали
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">У вас пока нет учеников</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА 2: Группы учеников -->
+        <div class="tab-pane fade" id="groups-pane" role="tabpanel" aria-labelledby="groups-tab">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold m-0">Группы</h2>
+                <a href="{% url 'group_create' %}" class="btn btn-primary shadow-sm">
+                    + Создать группу
+                </a>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Название группы</th>
+                            <th class="text-center">Количество учеников</th>
+                            <th class="text-center">Статус</th>
+                            <th class="text-end">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in groups %}
+                        <tr class="{% if group.status == 'completed' %}table-light opacity-50{% endif %}">
+                            <td>
+                                <a href="{% url 'group_detail' group.id %}" class="fw-bold text-decoration-none {% if group.status == 'completed' %}text-muted{% else %}text-black-50{% endif %}">
+                                    {{ group.name }}
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if group.status == 'completed' %}bg-secondary text-white{% else %}bg-light text-dark border{% endif %}">
+                                    {{ group.students.count }} чел.
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if group.status == 'completed' %}
+                                    <span class="badge bg-secondary">Обучение завершено</span>
+                                {% else %}
+                                    <span class="badge bg-success">Обучение идет</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a href="{% url 'group_detail' group.id %}" class="btn btn-sm btn-outline-primary me-1" title="Просмотр / ДЗ">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+
+                                {% if group.status != 'completed' %}
+                                    <a href="{% url 'group_edit' group.id %}" class="btn btn-sm btn-outline-secondary me-1" title="Редактировать группу">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{% url 'complete_group' group.id %}" class="d-inline" onsubmit="return confirm('Завершить обучение для группы &quot;{{ group.name }}&quot;?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Завершить обучение">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <div class="d-inline-block" style="width: 72px;"></div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">У вас пока нет созданных групп</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </div>
 
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Проверяем, есть ли хэш #groups в URL
+    if (window.location.hash === '#groups') {
+        var triggerEl = document.querySelector('#groups-tab');
+        if (triggerEl && typeof bootstrap !== 'undefined') {
+            var tab = new bootstrap.Tab(triggerEl);
+            tab.show();
+        }
+    }
+
+    // 2. Дополнительная гарантия переключения вкладок по клику (при отсутствии события от Bootstrap)
+    var tabTriggerList = [].slice.call(document.querySelectorAll('#teacherTab button[data-bs-toggle="tab"]'));
+    tabTriggerList.forEach(function (tabTriggerEl) {
+        tabTriggerEl.addEventListener('click', function (event) {
+            event.preventDefault();
+            if (typeof bootstrap !== 'undefined') {
+                var tab = new bootstrap.Tab(tabTriggerEl);
+                tab.show();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
