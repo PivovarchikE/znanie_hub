@@ -33,6 +33,7 @@ DEBUG = os.getenv("DEBUG") == "True"
 ALLOWED_HOSTS = [
     'biggest-indicate-ink-robertson.trycloudflare.com',
     'znanie-hub.instatunnel.my',
+    'znanie-hub-test.instatunnel.my',
     'localhost',
     '127.0.0.1',
 
@@ -58,7 +59,8 @@ CSRF_COOKIE_SAMESITE = 'None' # 'Lax' стабильнее для Cloudflare, ч
 CSRF_TRUSTED_ORIGINS = [
     'https://*.trycloudflare.com',
     'https://biggest-indicate-ink-robertson.trycloudflare.com',
-    'https://znanie-hub.instatunnel.my'
+    'https://znanie-hub.instatunnel.my',
+    'https://znanie-hub-test.instatunnel.my',
 ]
 
 # Длительность сессии (2 недели)
@@ -82,7 +84,8 @@ INSTALLED_APPS = [
     "courses",
     "users",
     "other_pages",
-    "schedule"
+    "schedule",
+    "boards"
 ]
 
 MIDDLEWARE = [
@@ -113,8 +116,14 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
+# WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = 'config.asgi.application'
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases

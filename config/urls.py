@@ -18,6 +18,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 from config import settings
 from courses import views as courses_views
@@ -31,8 +32,10 @@ urlpatterns = [
     path('', include('courses.urls')),
     path('', include('users.urls')),
     path('projects/', include('other_pages.urls')),
+    path('', include(('boards.urls', 'boards'), namespace='boards')),
 ]
 
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += staticfiles_urlpatterns()
