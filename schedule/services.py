@@ -24,14 +24,12 @@ def check_lesson_overlap(teacher, date_val, start_time, end_time, exclude_lesson
 
 
 @transaction.atomic
-def create_recurring_lessons(teacher, student, subject, days_of_week, start_time, end_time, price, start_date, end_date):
-    """
-    Создает правило повтора и генерирует уроки на указанный диапазон дат.
-    days_of_week: список индексов дней [0, 2] (0=Пн, 1=Вт, ..., 6=Вс)
-    """
+def create_recurring_lessons(teacher, student, subject, days_of_week, start_time, end_time,
+                             price, start_date, end_date, group=None):
     rule = RecurringRule.objects.create(
         teacher=teacher,
         student=student,
+        group=group,
         subject=subject,
         days_of_week=days_of_week,
         start_time=start_time,
@@ -50,6 +48,7 @@ def create_recurring_lessons(teacher, student, subject, days_of_week, start_time
                 Lesson(
                     teacher=teacher,
                     student=student,
+                    group=group,
                     subject=subject,
                     date=current_date,
                     start_time=start_time,

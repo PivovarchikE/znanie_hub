@@ -1,4 +1,6 @@
 import pytest
+import io
+from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from courses.models import Subject, Section, Topic, TrainingSession, Homework, HomeworkResponseFile
@@ -270,9 +272,13 @@ class TestHomeworkFiles:
         client.force_login(student_user)
         url = reverse('upload_hw_response', args=[homework.id])
 
-        # Имитируем загрузку двух фотографий
-        img1 = SimpleUploadedFile("solution1.jpg", b"data1", content_type="image/jpeg")
-        img2 = SimpleUploadedFile("solution2.jpg", b"data2", content_type="image/jpeg")
+        def _make_image(name):
+            buf = io.BytesIO()
+            Image.new('RGB', (10, 10), color='red').save(buf, 'JPEG')
+            return SimpleUploadedFile(name, buf.getvalue(), content_type="image/jpeg")
+
+        img1 = _make_image("solution1.jpg")
+        img2 = _make_image("solution2.jpg")
 
         response = client.post(url, {'files': [img1, img2]})
 
