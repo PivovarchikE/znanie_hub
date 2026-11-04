@@ -53,6 +53,7 @@
                             <th>Ученик</th>
                             <th>Класс</th>
                             <th>Группы</th>
+                            <th>Доска</th>
                             <th class="text-center">Чат</th>
                             <th class="text-center">Инфо</th>
                         </tr>
@@ -73,6 +74,13 @@
                                 {% empty %}
                                     <span class="text-muted small">—</span>
                                 {% endfor %}
+                            </td>
+                            <td>
+                                <a href="{% url 'boards:open_entity_board' 'student' student.id %}"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-easel"></i> Доска
+                                </a>
                             </td>
                             <td class="text-center">
                                 <a href="#" class="btn btn-link position-relative">
@@ -116,6 +124,7 @@
                             <th>Название группы</th>
                             <th class="text-center">Количество учеников</th>
                             <th class="text-center">Статус</th>
+                            <th class="text-center">Доска</th>
                             <th class="text-end">Действия</th>
                         </tr>
                     </thead>
@@ -138,6 +147,13 @@
                                 {% else %}
                                     <span class="badge bg-success">Обучение идет</span>
                                 {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'boards:open_entity_board' 'group' group.id %}"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-easel"></i> Доска
+                                </a>
                             </td>
                             <td class="text-end text-nowrap">
                                 <a href="{% url 'group_detail' group.id %}" class="btn btn-sm btn-outline-primary me-1" title="Просмотр / ДЗ">
@@ -173,25 +189,30 @@
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. Проверяем, есть ли хэш #groups в URL
-    if (window.location.hash === '#groups') {
-        var triggerEl = document.querySelector('#groups-tab');
-        if (triggerEl && typeof bootstrap !== 'undefined') {
-            var tab = new bootstrap.Tab(triggerEl);
-            tab.show();
+document.addEventListener("DOMContentLoaded", function () {
+    var KEY = 'teacher_dashboard_tab';
+
+    function showTab(id) {
+        // берём только кнопки из переключателя, чтобы мусор из localStorage ничего не сломал
+        var el = document.querySelector('#teacherTab button[id="' + id + '"]');
+        if (el && typeof bootstrap !== 'undefined') {
+            bootstrap.Tab.getOrCreateInstance(el).show();
         }
     }
 
-    // 2. Дополнительная гарантия переключения вкладок по клику (при отсутствии события от Bootstrap)
-    var tabTriggerList = [].slice.call(document.querySelectorAll('#teacherTab button[data-bs-toggle="tab"]'));
-    tabTriggerList.forEach(function (tabTriggerEl) {
-        tabTriggerEl.addEventListener('click', function (event) {
-            event.preventDefault();
-            if (typeof bootstrap !== 'undefined') {
-                var tab = new bootstrap.Tab(tabTriggerEl);
-                tab.show();
-            }
+    // 1. Восстанавливаем вкладку: #groups в адресе приоритетнее, иначе берём сохранённую
+    var initial = null;
+    if (window.location.hash === '#groups') {
+        initial = 'groups-tab';
+    } else {
+        try { initial = localStorage.getItem(KEY); } catch (e) {}
+    }
+    if (initial) showTab(initial);
+
+    // 2. Запоминаем выбор при каждом переключении
+    document.querySelectorAll('#teacherTab button[data-bs-toggle="tab"]').forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function (e) {
+            try { localStorage.setItem(KEY, e.target.id); } catch (err) {}
         });
     });
 });

@@ -629,11 +629,19 @@ def student_dashboard_view(request):
 
     teachers = student_profile.teachers.all().select_related('user').prefetch_related('subjects')
 
+    # Группы, в которых состоит ученик (завершённые не показываем). Чтобы показать - убираем active статус
+    groups = (StudentGroup.objects
+              .filter(students=student_profile, status='active')
+              .select_related('teacher__user')
+              .prefetch_related('students')
+              .order_by('name'))
+
     logger.info(f'Student dashboard view: student {request.user} open dashboard')
 
     return render(request, 'student_dashboard.html', {
         'homeworks': homeworks,
         'teachers': teachers,
+        'groups': groups,
         'student': student_profile
     })
 

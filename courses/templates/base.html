@@ -18,7 +18,7 @@
     <link rel="manifest" href="{% static 'site.webmanifest' %}">
 </head>
 <body>
-
+{% block header %}
 <nav class="navbar navbar-expand-xl navbar-light bg-white border-bottom sticky-top shadow-sm p-0">
     <div class="container-fluid px-3 px-md-5 d-block">
         <div class="d-flex align-items-center justify-content-between w-100 py-2">
@@ -223,7 +223,7 @@
         </div>
     </div>
 </nav>
-
+{% endblock %}
 {% if messages %}
     <div class="container mt-3">
         {% for message in messages %}
