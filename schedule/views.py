@@ -20,6 +20,13 @@ from .services import (
 )
 
 
+def _teacher_or_403(request):
+    teacher = getattr(request.user, 'teacher_profile', None)
+    if not teacher:
+        return None, JsonResponse({'success': False, 'message': 'forbidden'}, status=403)
+    return teacher, None
+
+
 @login_required
 def schedule_dashboard_view(request):
     """Основной рендер страницы расписания для учителя"""
@@ -73,7 +80,9 @@ def schedule_dashboard_view(request):
 @require_http_methods(['GET'])
 def get_week_schedule_api(request):
     """API получения уроков и аналитики (поддерживает week и month)"""
-    teacher = request.user.teacher_profile
+    teacher, error = _teacher_or_403(request)
+    if error:
+        return error
 
     date_str = request.GET.get('date')
     if date_str:
@@ -166,27 +175,47 @@ def get_week_schedule_api(request):
 @transaction.atomic
 def save_lesson_api(request):
     """API создания или редактирования урока"""
-    teacher = request.user.teacher_profile
-    data = json.loads(request.body)
+    teacher, error = _teacher_or_403(request)
+    if error:
+        return error
 
-    lesson_id = int(data['id']) if data.get('id') else None
-    target_type = data.get('target_type', 'student')
+    try:
+        data = json.loads(request.body)
+        lesson_id = int(data['id']) if data.get('id') else None
+        target_type = data.get('target_type', 'student')
 
-    student_id = int(data['student_id']) if target_type == 'student' and data.get('student_id') else None
-    group_id = int(data['group_id']) if target_type == 'group' and data.get('group_id') else None
-    subject_id = int(data['subject_id']) if data.get('subject_id') else None
+        student_id = int(data['student_id']) if target_type == 'student' and data.get('student_id') else None
+        group_id = int(data['group_id']) if target_type == 'group' and data.get('group_id') else None
+        subject_id = int(data['subject_id']) if data.get('subject_id') else None
 
-    date_val = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    start_time = datetime.strptime(data['start_time'], '%H:%M').time()
-    end_time = datetime.strptime(data['end_time'], '%H:%M').time()
-    price = Decimal(str(data.get('price', 0)))
+        date_val = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        start_time = datetime.strptime(data['start_time'], '%H:%M').time()
+        end_time = datetime.strptime(data['end_time'], '%H:%M').time()
+        price = Decimal(str(data.get('price', 0)))
+    except (ValueError, KeyError, TypeError, ArithmeticError):
+        return JsonResponse({'success': False, 'message': 'Некорректные данные запроса'}, status=400)
+
     status = data.get('status', Lesson.Status.SCHEDULED)
     payment_status = data.get('payment_status', Lesson.PaymentStatus.UNPAID)
     topic = data.get('topic', '')
 
+    if status not in Lesson.Status.values or payment_status not in Lesson.PaymentStatus.values:
+        return JsonResponse({'success': False, 'message': 'Некорректный статус'}, status=400)
+
     is_recurring = data.get('is_recurring', False)
-    update_mode = data.get('update_mode', 'this_only')
     force_save = data.get('force_save', False)
+
+    # Принадлежность связанных объектов ЭТОМУ учителю
+    student = teacher.my_students.filter(id=student_id).first() if student_id else None
+    group = teacher.student_groups.filter(id=group_id).first() if group_id else None
+    subject = teacher.subjects.filter(id=subject_id).first() if subject_id else None
+
+    if target_type == 'student' and not student:
+        return JsonResponse({'success': False, 'message': 'Выберите ученика'}, status=400)
+    if target_type == 'group' and not group:
+        return JsonResponse({'success': False, 'message': 'Выберите группу'}, status=400)
+    if subject_id and not subject:
+        return JsonResponse({'success': False, 'message': 'Предмет не найден'}, status=400)
 
     # 1. Проверка на пересечение по времени
     overlap = check_lesson_overlap(teacher, date_val, start_time, end_time, exclude_lesson_id=lesson_id)
@@ -206,12 +235,13 @@ def save_lesson_api(request):
     # 2. Создание новой серии уроков
     if is_recurring and not lesson_id:
         days_of_week = data.get('days_of_week', [date_val.weekday()])
-        weeks_count = int(data.get('weeks_count', 4))
-        end_date = date_val + timedelta(weeks=weeks_count)
+        if not isinstance(days_of_week, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days_of_week):
+            return JsonResponse({'success': False, 'message': 'Некорректные дни недели'}, status=400)
 
-        student = teacher.my_students.filter(id=student_id).first() if student_id else None
-        group = teacher.student_groups.filter(id=group_id).first() if group_id else None
-        subject = teacher.subjects.filter(id=subject_id).first() if subject_id else None
+        try:
+            weeks_count = max(1, min(int(data.get('weeks_count', 4)), 52))
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'message': 'Некорректное число недель'}, status=400)
 
         create_recurring_lessons(
             teacher=teacher,
@@ -223,19 +253,19 @@ def save_lesson_api(request):
             end_time=end_time,
             price=price,
             start_date=date_val,
-            end_date=end_date
+            end_date=date_val + timedelta(weeks=weeks_count),
         )
         return JsonResponse({'success': True, 'message': "Серия уроков успешно добавлена"})
 
-    # 3. Сохранение одиночного урока или обновление серии
+    # 3. Сохранение одиночного урока
     if lesson_id:
         lesson = get_object_or_404(Lesson, id=lesson_id, teacher=teacher)
     else:
         lesson = Lesson(teacher=teacher)
 
-    lesson.student_id = student_id
-    lesson.group_id = group_id
-    lesson.subject_id = subject_id
+    lesson.student = student
+    lesson.group = group
+    lesson.subject = subject
     lesson.date = date_val
     lesson.start_time = start_time
     lesson.end_time = end_time
@@ -252,7 +282,9 @@ def save_lesson_api(request):
 @require_http_methods(['POST'])
 def delete_lesson_api(request, lesson_id):
     """Удаление урока с учетом режимов серии"""
-    teacher = request.user.teacher_profile
+    teacher, error = _teacher_or_403(request)
+    if error:
+        return error
     lesson = get_object_or_404(Lesson, id=lesson_id, teacher=teacher)
 
     data = json.loads(request.body)

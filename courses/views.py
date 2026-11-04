@@ -1,9 +1,12 @@
 import json
 import sys
+import uuid
+
+from PIL import Image
 
 from django.contrib import messages
 from django.contrib.postgres.search import SearchVector
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
@@ -54,12 +57,16 @@ def topic_detail(request, topic_id):
 
     homework_id = request.GET.get('hw')
     preset_config_id = request.GET.get('config')
+    if preset_config_id and not preset_config_id.isdigit():
+        preset_config_id = None
+
     all_configs = topic.configs.all()
 
     is_completed = False
     current_homework = None
 
-    if homework_id:
+    # Домашнее задание подтягиваем только для авторизованного ученика-владельца
+    if homework_id and homework_id.isdigit() and request.user.is_authenticated:
         current_homework = Homework.objects.filter(
             id=homework_id,
             student__user=request.user
@@ -67,7 +74,6 @@ def topic_detail(request, topic_id):
 
         if current_homework:
             is_completed = current_homework.is_completed
-            # Если в URL не было конфига, берем его из домашки
             if not preset_config_id and current_homework.simulator_config:
                 preset_config_id = str(current_homework.simulator_config.id)
 
@@ -100,7 +106,7 @@ def topic_detail(request, topic_id):
 
         # Данные для JS-скрипта тренажера
         'preset_config_id': preset_config_id,
-        'homework_id': homework_id,
+        'homework_id': current_homework.id if current_homework else None,
         'is_already_completed': is_completed,
         'current_homework': current_homework,
     }
@@ -427,26 +433,32 @@ def edit_homework_view(request, hw_id):
         'edit_mode': True
     })
 
-@login_required
-@require_http_methods(['POST'])
-def grade_practice(request, pk):
-    if not hasattr(request.user, 'teacher_profile'):
-        return HttpResponseForbidden("Только учителя могут выставлять оценки.")
 
-    homework = get_object_or_404(Homework, pk=pk, teacher=request.user.teacherprofile)
-    if request.method == 'POST':
-        try:
-            score = int(request.POST.get('actual_score'))
-            if 0 <= score <= 100:
-                homework.actual_score = score
-            else:
-                messages.error(request, "Неверный диапазон оценки")
-        except (ValueError, TypeError):
-            messages.error(request, "Оценка должна быть числом в диапазоне 1-100")
+ALLOWED_IMAGE_FORMATS = {'JPEG': 'jpg', 'PNG': 'png', 'WEBP': 'webp', 'GIF': 'gif'}
+MAX_RESPONSE_FILE_SIZE = 10 * 1024 * 1024   # 10 МБ
+MAX_RESPONSE_FILES = 10
 
-        homework.is_completed = True
-        homework.save()
-        return redirect('homework_view_detail', pk=pk)
+
+def _clean_response_image(uploaded):
+    """Проверяет, что файл — настоящая картинка разрешённого формата, и задаёт безопасное имя."""
+    if uploaded.size > MAX_RESPONSE_FILE_SIZE:
+        raise ValidationError(f"Файл «{uploaded.name}» больше 10 МБ.")
+    try:
+        img = Image.open(uploaded)
+        img.verify()
+        fmt = img.format
+    except Exception:
+        raise ValidationError(f"Файл «{uploaded.name}» не является изображением.")
+    finally:
+        uploaded.seek(0)
+
+    ext = ALLOWED_IMAGE_FORMATS.get(fmt)
+    if not ext:
+        raise ValidationError(f"Формат файла «{uploaded.name}» не поддерживается.")
+
+    # Расширение берём из реального формата, имя заменяем на случайное
+    uploaded.name = f"{uuid.uuid4().hex}.{ext}"
+    return uploaded
 
 
 @login_required
@@ -458,60 +470,85 @@ def upload_hw_response(request, hw_id):
         files = request.FILES.getlist('files')
         if not files:
             messages.warning(request, "Вы не выбрали ни одного файла.")
-            return redirect('homework_view_detail', pk=hw_id)
+            return redirect('homework_view_detail', hw_id=hw_id)
 
-        for f in files:
+        if len(files) > MAX_RESPONSE_FILES:
+            messages.error(request, f"Можно загрузить не более {MAX_RESPONSE_FILES} файлов за раз.")
+            return redirect('homework_view_detail', hw_id=hw_id)
+
+        try:
+            cleaned = [_clean_response_image(f) for f in files]
+        except ValidationError as e:
+            messages.error(request, e.messages[0])
+            return redirect('homework_view_detail', hw_id=hw_id)
+
+        for f in cleaned:
             HomeworkResponseFile.objects.create(homework=homework, file=f)
 
-        messages.success(request, f"Успешно загружено файлов: {len(files)}. Ожидайте проверки учителем.")
+        messages.success(request, f"Успешно загружено файлов: {len(cleaned)}. Ожидайте проверки учителем.")
 
     return redirect('homework_view_detail', hw_id=hw_id)
 
 
 @login_required
-@require_http_methods(['POST', 'GET'])
+@require_POST
 def grade_homework(request, hw_id):
     homework = get_object_or_404(Homework, id=hw_id, teacher__user=request.user)
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        score = request.POST.get('actual_score')
-        comment_text = request.POST.get('teacher_comment')
 
+    action = request.POST.get('action')
+    comment_text = (request.POST.get('teacher_comment') or '').strip()
+    raw_score = (request.POST.get('actual_score') or '').strip()
+
+    if action not in ('accept', 'reject'):
+        messages.error(request, "Неизвестное действие.")
+        return redirect('homework_view_detail', hw_id=hw_id)
+
+    score = None
+    if raw_score:
+        try:
+            score = int(raw_score)
+        except ValueError:
+            score = None
+        if score is None or not 0 <= score <= 10:
+            messages.error(request, "Балл должен быть целым числом от 0 до 10.")
+            return redirect('homework_view_detail', hw_id=hw_id)
+
+    if action == 'accept' and score is None:
+        messages.error(request, "Необходимо выставить балл для принятия работы.")
+        return redirect('homework_view_detail', hw_id=hw_id)
+
+    with transaction.atomic():
         if comment_text:
             HomeworkComment.objects.create(
-                homework=homework,
-                author=request.user,
-                text=comment_text
+                homework=homework, author=request.user, text=comment_text
             )
 
         if action == 'accept':
-            if not score:
-                messages.error(request, "Необходимо выставить балл для принятия работы.")
-                return redirect('homework_view_detail', hw_id=hw_id)
             homework.status = 'completed'
             homework.is_completed = True
             homework.actual_score = score
-        elif action == 'reject':
+        else:
             homework.status = 'correction'
             homework.is_completed = False
-            if score:
+            if score is not None:
                 homework.actual_score = score
 
         homework.save()
+
     return redirect('homework_view_detail', hw_id=hw_id)
 
 
 @login_required
-@require_http_methods(['POST', 'GET'])
+@require_POST
 def mark_theory_read(request, hw_id):
     homework = get_object_or_404(Homework, id=hw_id, teacher__user=request.user)
 
-    if request.user.role.slug == 'teacher' and not homework.is_completed:
-        if request.method == 'POST':
-            homework.is_completed = True
-            # Для теории баллы не выставляем (остается None или 0)
-            homework.save()
-            messages.success(request, f"Теория по теме «{homework.title}» подтверждена.")
+    if not homework.is_completed:
+        homework.is_theory_read = True
+        homework.is_completed = True
+        # Для теории баллы не выставляем
+        homework.save()
+        messages.success(request, f"Теория по теме «{homework.title}» подтверждена.")
 
     return redirect('homework_view_detail', hw_id=hw_id)
 
@@ -975,17 +1012,28 @@ def group_edit_hw_view(request, group_id, homework_id):
 @login_required
 @require_POST
 def group_delete_hw_view(request, group_id, homework_id):
-    group = get_object_or_404(StudentGroup, id=group_id)
-    target_hw = get_object_or_404(Homework, id=homework_id)
+    teacher_profile = getattr(request.user, 'teacher_profile', None)
+    if not teacher_profile:
+        raise PermissionDenied("Доступ разрешен только преподавателям.")
 
-    # Находим и удаляем все записи ДЗ с таким же названием и предметом для данной группы
-    # (если ДЗ создавалось пакетом на всех учеников)
-    deleted_count, _ = Homework.objects.filter(
-        student__in=group.students.all(),
-        title=target_hw.title,
-        subject=target_hw.subject,
-        hw_type=target_hw.hw_type
-    ).delete()
+    group = get_object_or_404(StudentGroup, pk=group_id, teacher=teacher_profile)
+    target_hw = get_object_or_404(
+        Homework, pk=homework_id, group=group, teacher=teacher_profile
+    )
 
-    messages.success(request, f'Домашнее задание "{target_hw.title}" успешно удалено для всех учеников группы.')
+    with transaction.atomic():
+        batch = Homework.objects.filter(
+            group=group,
+            teacher=teacher_profile,
+            title=target_hw.title,
+            subject=target_hw.subject,
+            hw_type=target_hw.hw_type,
+        )
+        for hw in batch:
+            hw.delete()   # soft delete с каскадом по связанным объектам
+
+    messages.success(
+        request,
+        f'Домашнее задание "{target_hw.title}" успешно удалено для всех учеников группы.'
+    )
     return redirect('group_detail', pk=group.pk)
