@@ -285,3 +285,18 @@ class TestHomeworkFiles:
         assert response.status_code == 302
         # Проверяем создание записей в HomeworkResponseFile
         assert HomeworkResponseFile.objects.filter(homework=homework).count() == 2
+
+
+@pytest.mark.django_db
+def test_topic_detail_uses_homework_settings(client, student_user, teacher_user, subject, topic):
+    from courses.models import SimulatorConfig, Homework
+    conf = SimulatorConfig.objects.create(topic=topic, label='Умн', params={'kind': 'multiplication_table'})
+    hw = Homework.objects.create(
+        student=student_user.student_profile, teacher=teacher_user.teacher_profile,
+        subject=subject, topic=topic, hw_type='simulator', simulator_config=conf,
+        simulator_settings={'factor': '7'}, title='t')
+    client.force_login(student_user)
+    resp = client.get(reverse('topic_detail', args=[topic.id]), {'hw': hw.id})
+    data = resp.context['all_configs_json'][str(conf.id)]
+    assert data['picker'] is None
+    assert all('7' in p['question'].split(' × ') for p in data['problems'])

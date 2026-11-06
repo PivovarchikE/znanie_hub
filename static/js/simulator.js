@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentStep: document.getElementById('currentStep'),
         nextBtn: document.getElementById('nextBtn'),
         finishBtn: document.getElementById('finishEarlyBtn'),
-        startBtn: document.getElementById('startWorkoutBtn')
+        startBtn: document.getElementById('startWorkoutBtn'),
+        totalSteps: document.getElementById('totalSteps'),
     };
 
     // --- ИНИЦИАЛИЗАЦИЯ ТЕОРИИ ---
@@ -41,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ФУНКЦИИ ЛОГИКИ ТЕОРИИ ---
     function initTheoryNavigation() {
         const slides = document.querySelectorAll('.theory-slide');
-        console.log("DEBUG: Найдено слайдов в DOM:", slides.length); // ДЕБАГ
         const totalSlides = slides.length;
         if (totalSlides === 0) return;
 
@@ -102,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateTheorySlide(0);
 
-        // Кнопка "Я изучил материал"
         const markTheoryBtn = document.getElementById('markTheoryDone');
         if (markTheoryBtn) {
             markTheoryBtn.addEventListener('click', async function() {
@@ -133,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- ФУНКЦИИ ЛОГИКИ ТРЕНАЖЕРА (Твой оригинальный код) ---
+    // --- ФУНКЦИИ ЛОГИКИ ТРЕНАЖЕРА ---
     function initWorkout(configId) {
         if (CONFIG_DATA.presetConfigId && String(configId) !== String(CONFIG_DATA.presetConfigId)) {
             console.warn("Переключение режимов заблокировано.");
@@ -160,16 +159,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function startWorkout() {
-        if (CONFIG_DATA.isAlreadyCompleted || !activeProblems.length) return;
-        elements.setupScreen.classList.add('d-none');
-        elements.workoutScreen.classList.remove('d-none');
-        window.scrollTo(0, 0);
-        currentIdx = 0;
-        results = [];
-        startTime = new Date();
-        startTimer();
-        loadQuestion();
+    let starting = false;
+
+    async function startWorkout() {
+        if (CONFIG_DATA.isAlreadyCompleted || starting || !currentConfigId) return;
+        starting = true;
+        try {
+            const conf = allConfigs[String(currentConfigId)];
+            if (conf && conf.picker) {
+                if (!window.TaskPicker) {
+                    alert('Не загрузился модуль выбора заданий. Обновите страницу (Ctrl+F5).');
+                    return;
+                }
+                const fresh = await window.TaskPicker.fetchProblems(currentConfigId);
+                if (!fresh) return;
+                conf.problems = fresh;
+                activeProblems = fresh;
+            }
+            if (!activeProblems.length) return;
+
+            elements.setupScreen.classList.add('d-none');
+            elements.workoutScreen.classList.remove('d-none');
+            window.scrollTo(0, 0);
+            currentIdx = 0;
+            results = [];
+            startTime = new Date();
+            if (elements.totalSteps) elements.totalSteps.innerText = activeProblems.length;
+            startTimer();
+            loadQuestion();
+        } finally {
+            starting = false;
+        }
     }
 
     function loadQuestion() {
@@ -185,6 +205,13 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.progressBar.style.width = `${(currentIdx / activeProblems.length) * 100}%`;
     }
 
+    function sameAnswer(user, correct) {
+        const u = String(user).trim().replace(',', '.');
+        const c = String(correct).trim();
+        if (u !== '' && !isNaN(u) && !isNaN(c)) return Number(u) === Number(c);
+        return u === c;
+    }
+
     function handleNext() {
         const val = elements.input.value.trim();
         if (!val) return;
@@ -192,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             q: activeProblems[currentIdx].question,
             user_a: val,
             correct_a: activeProblems[currentIdx].answer,
-            is_correct: val === String(activeProblems[currentIdx].answer)
+            is_correct: sameAnswer(val, activeProblems[currentIdx].answer)
         });
         currentIdx++;
         loadQuestion();
@@ -206,51 +233,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    // --- ЛОГИКА МОДАЛЬНОГО ОКНА (РЕЗУЛЬТАТЫ) ---
-const showDetailsBtn = document.getElementById('showDetailsBtn');
-const detailedResults = document.getElementById('detailedResults');
-const detailsTableBody = document.getElementById('detailsTableBody');
-
-if (showDetailsBtn) {
-    showDetailsBtn.addEventListener('click', function() {
-        // Переключаем видимость блока с таблицей
-        detailedResults.classList.toggle('d-none');
-
-        // Меняем текст кнопки в зависимости от состояния
-        if (detailedResults.classList.contains('d-none')) {
-            this.innerText = 'Подробнее';
-        } else {
-            this.innerText = 'Скрыть детали';
-            renderDetailedTable(); // Отрисовываем таблицу
+    // --- ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ---
+    if (CONFIG_DATA.presetConfigId) {
+        initWorkout(CONFIG_DATA.presetConfigId);
+    } else {
+        const selectBtns = document.querySelectorAll('.config-select-btn');
+        if (selectBtns.length === 0) {
+            // Если кнопок выбора нет (Таблица умножения / Умножение и деление),
+            // автоматически инициализируем конфиг с пикером, чтобы currentConfigId не был null.
+            const pickerConfigId = Object.keys(allConfigs).find(id => allConfigs[id].picker);
+            if (pickerConfigId) {
+                initWorkout(pickerConfigId);
+            }
         }
-    });
-}
+    }
 
-function renderDetailedTable() {
-    if (!detailsTableBody) return;
-
-    // Очищаем таблицу перед заполнением
-    detailsTableBody.innerHTML = '';
-
-    results.forEach((res, index) => {
-        const row = document.createElement('tr');
-        // Добавляем класс подсветки строки (зеленый/красный)
-        row.className = res.is_correct ? 'table-success-light' : 'table-danger-light';
-
-        row.innerHTML = `
-            <td class="fw-medium">${res.q}</td>
-            <td class="${res.is_correct ? 'text-success' : 'text-danger'} fw-bold">${res.user_a}</td>
-            <td><span class="badge bg-success">${res.correct_a}</span></td>
-            <td class="text-center">
-                ${res.is_correct ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle-fill text-danger"></i>'}
-            </td>
-        `;
-        detailsTableBody.appendChild(row);
-    });
-}
-
-    // События тренажера
-    if (CONFIG_DATA.presetConfigId) initWorkout(CONFIG_DATA.presetConfigId);
     document.querySelectorAll('.config-select-btn').forEach(btn => {
         btn.addEventListener('click', () => { if(!btn.disabled) initWorkout(btn.dataset.id); });
     });
@@ -263,25 +260,62 @@ function renderDetailedTable() {
         const total = results.length;
         const correctCount = results.filter(r => r.is_correct).length;
 
+        // 1. Заполняем таблицу подробных результатов
+        const tbody = document.getElementById('detailsTableBody');
+        if (tbody) {
+            tbody.innerHTML = results.map(r => `
+                <tr>
+                    <td>${r.q}</td>
+                    <td>${r.user_a}</td>
+                    <td>${r.correct_a}</td>
+                    <td class="text-center">${r.is_correct ? '✅' : '❌'}</td>
+                </tr>
+            `).join('');
+        }
+
         const modal = new bootstrap.Modal(document.getElementById('resultModal'));
         document.getElementById('resSolved').innerText = total;
         document.getElementById('resCorrectCount').innerText = correctCount;
-        document.getElementById('resCorrectPercent').innerText = Math.round((correctCount/total)*100) + '%';
+        document.getElementById('resCorrectPercent').innerText = (total ? Math.round((correctCount/total)*100) : 0) + '%';
         document.getElementById('resTime').innerText = elements.timer.innerText;
         modal.show();
 
+        // 2. Настраиваем кнопку «Подробнее» для переключения видимости отчета
+        const showDetailsBtn = document.getElementById('showDetailsBtn');
+        const detailedResults = document.getElementById('detailedResults');
+        if (showDetailsBtn && detailedResults) {
+            // Сбрасываем состояние при открытии модального окна
+            detailedResults.classList.add('d-none');
+            showDetailsBtn.innerText = 'Подробнее';
+
+            // Удаляем старые обработчики во избежание дублирования и вешаем новый
+            showDetailsBtn.onclick = () => {
+                const isHidden = detailedResults.classList.contains('d-none');
+                detailedResults.classList.toggle('d-none');
+                showDetailsBtn.innerText = isHidden ? 'Скрыть' : 'Подробнее';
+            };
+        }
+
         if (CONFIG_DATA.isAuthenticated) {
-            await fetch('/save_training_result/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({
-                    config_id: currentConfigId,
-                    homework_id: CONFIG_DATA.assignmentId,
-                    total: total,
-                    correct: correctCount,
-                    details: results
-                })
-            });
+            let saved = false;
+            try {
+                const res = await fetch('/save_training_result/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG_DATA.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({
+                        config_id: currentConfigId,
+                        homework_id: CONFIG_DATA.assignmentId,
+                        total: total,
+                        correct: correctCount,
+                        details: results
+                    })
+                });
+                saved = res.ok;
+            } catch (e) { console.error(e); }
+
+            if (!saved) {
+                alert('Не удалось сохранить результат. Проверьте соединение и попробуйте снова.');
+            }
             const closeBtn = document.getElementById('closeModalBtn');
             if (closeBtn) {
                 closeBtn.innerText = "Завершить";

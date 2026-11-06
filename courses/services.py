@@ -74,3 +74,11 @@ def assign_homework_to_group(teacher_profile, group, homework_data, files=None):
         created_homeworks.append(hw)
 
     return created_homeworks
+
+
+def _bounded(value, lo, hi, default):
+    """int из JSON-конфига, ограниченный диапазоном [lo, hi]."""
+    try:
+        return max(lo, min(hi, int(value)))
+    except (TypeError, ValueError):
+        return default

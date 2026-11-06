@@ -39,9 +39,17 @@
         </div>
     {% endif %}
 
+    {% if is_teacher_preview %}
+    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center mb-4">
+        <i class="bi bi-eye fs-4 me-3"></i>
+        <div>Режим предпросмотра. Результат не сохранится и не повлияет на задание ученика.</div>
+    </div>
+    {% endif %}
+
     <div id="setupScreen">
         <div class="row">
             {# --- ЛЕВАЯ КОЛОНКА: ТЕОРИЯ --- #}
+            {% if homework_type != 'simulator' %}
             <div class="col-lg-7 mb-4">
                 <div class="card shadow-sm border-0 p-0 overflow-hidden h-100">
                     <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center">
@@ -87,13 +95,11 @@
                         </button>
 
                         <div id="finishTheoryBlock" class="d-none animate__animated animate__bounceIn">
-                            {% if current_homework.hw_type == 'theory' or current_homework.include_site_theory %}
-                                {% if not is_already_completed %}
-                                    <button id="markTheoryDone" class="btn btn-success rounded-pill px-4 py-2 shadow-sm">
-                                        ✅ Я изучил материал
-                                    </button>
-                                {% endif %}
+
+                            {% if current_homework.hw_type == 'interactive_theory' and not is_already_completed and not is_teacher_preview %}
+                                <button id="markTheoryDone" class="btn btn-success rounded-pill px-4 py-2 shadow-sm">✅ Я изучил материал</button>
                             {% endif %}
+
                         </div>
 
                         <button id="next-slide" class="btn btn-primary rounded-pill px-4 py-2">
@@ -103,60 +109,50 @@
                     {% endif %}
                 </div>
             </div>
-
+            {% endif %}
+            {% if homework_type != 'interactive_theory' %}
             {# --- ПРАВАЯ КОЛОНКА: ТРЕНАЖЕРЫ --- #}
             <div class="col-lg-5 mb-4">
                 {# Блокируем тренажеры только если ДЗ было именно типа "тренажер" и оно выполнено #}
-                <div class="{% if is_already_completed and current_homework.hw_type == 'simulator' %}opacity-50 pe-none{% endif %}">
-
-                    <div class="card shadow-sm border-0 p-4 mb-4">
+                <div class="card shadow-sm border-0 p-4 mb-4">
+                        {% if homework_settings_label %}
+                            <div class="alert alert-info border-0 shadow-sm mb-4">
+                                <i class="bi bi-sliders me-1"></i> Параметры задания: <strong>{{ homework_settings_label }}</strong>
+                            </div>
+                        {% endif %}
                         <h4 class="fw-bold mb-3">🧩 Тренировка</h4>
                         <p class="text-muted small">Случайные примеры для отработки навыка</p>
                         <div class="d-grid gap-2">
                             {% for conf in practice_configs %}
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-lg text-start config-select-btn
-                                               {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}opacity-50{% endif %}"
-                                        data-id="{{ conf.id }}"
-                                        {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}disabled{% endif %}>
-                                    <i class="bi bi-play-circle me-2"></i> {{ conf.label }}
-                                    {% if preset_config_id and preset_config_id == conf.id|stringformat:'s' %}
-                                        <span class="badge bg-primary ms-2">ВАШЕ ЗАДАНИЕ</span>
-                                    {% endif %}
-                                </button>
+                                {# Показываем кнопку только для обычных тренажеров (например, сложение/вычитание), скрывая общие кнопки с пикером #}
+                                {% if not conf.params.kind %}
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-lg text-start config-select-btn
+                                                   {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}opacity-50{% endif %}"
+                                            data-id="{{ conf.id }}"
+                                            {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}disabled{% endif %}>
+                                        <i class="bi bi-play-circle me-2"></i> {{ conf.label }}
+                                        {% if preset_config_id and preset_config_id == conf.id|stringformat:'s' %}
+                                            <span class="badge bg-primary ms-2">ВАШЕ ЗАДАНИЕ</span>
+                                        {% endif %}
+                                    </button>
+                                {% endif %}
                             {% empty %}
                                 <p class="small text-secondary">Тренажеры скоро появятся.</p>
                             {% endfor %}
                         </div>
                     </div>
 
-                    {% if exam_configs %}
-                    <div class="card shadow-sm border-0 p-4 bg-light border-start border-warning border-4">
-                        <h4 class="fw-bold mb-3 text-dark">📝 Самостоятельная работа</h4>
-                        <div class="d-grid gap-2">
-                            {% for conf in exam_configs %}
-                                <button type="button"
-                                        class="btn btn-warning btn-lg text-start config-select-btn
-                                               {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}opacity-50{% endif %}"
-                                        data-id="{{ conf.id }}"
-                                        {% if preset_config_id and preset_config_id != conf.id|stringformat:'s' %}disabled{% endif %}>
-                                    <i class="bi bi-pencil-square me-2"></i> {{ conf.label }}
-                                </button>
-                            {% endfor %}
+                    {# Блок выбора режима и параметров (всегда виден) #}
+                    <div id="selectedModeInfo" class="mt-4">
+                        <div class="alert alert-info border-0 shadow-sm mb-3">
+                            Выбран режим: <strong id="currentModeLabel">Не выбран</strong>
                         </div>
-                    </div>
-                    {% endif %}
-
-                    {# Кнопка старта (появляется при выборе режима) #}
-                    <div id="selectedModeInfo" class="mt-4 d-none">
-                        <div class="alert alert-info border-0 shadow-sm">
-                            Выбран режим: <strong id="currentModeLabel"></strong>
-                        </div>
+                        <div id="pickerBox" class="mb-3" data-api="{% url 'ajax_generate_tasks' %}"></div>
                         <div class="d-grid">
-                            <button id="startWorkoutBtn" class="btn btn-success btn-lg py-3 shadow">Начать выполнение</button>
+                            <button id="startWorkoutBtn" class="btn btn-success btn-lg py-3 shadow" disabled>Начать выполнение</button>
                         </div>
                     </div>
-                </div>
 
                 {% if is_already_completed and current_homework.hw_type == 'simulator' %}
                     <div class="alert alert-warning border-0 shadow-sm text-center mt-3">
@@ -164,6 +160,7 @@
                     </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -173,7 +170,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <button class="btn btn-outline-secondary" onclick="window.location.reload()">← К теории</button>
                 <div id="timer" class="fw-bold text-primary fs-3">00:00</div>
-                <div class="text-muted">Прогресс: <span id="currentStep">1</span>/5</div>
+                <div class="text-muted">Прогресс: <span id="currentStep">1</span>/<span id="totalSteps">5</span></div>
             </div>
             <div class="progress mt-3" style="height: 10px;">
                 <div id="progressBar" class="progress-bar bg-success" style="width: 0%"></div>
@@ -202,11 +199,14 @@
         assignmentId: "{{ homework_id|default:'' }}",
         isAlreadyCompleted: {{ is_already_completed|yesno:"true,false" }},
         csrfToken: "{{ csrf_token }}",
-        isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }}
+        isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }},
+        isTeacherPreview: {{ is_teacher_preview|yesno:"true,false" }},
     };
 
 </script>
 <script src="{% static 'js/simulator.js' %}"></script>
+<script src="{% static 'js/picker_ui.js' %}"></script>
+<script src="{% static 'js/task_picker.js' %}"></script>
 
 <style>
     .pe-none { pointer-events: none; }
