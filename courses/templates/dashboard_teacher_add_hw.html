@@ -59,13 +59,6 @@
                         {% if form.hw_type.errors %}<div class="text-danger small">{{ form.hw_type.errors.0 }}</div>{% endif %}
                     </div>
 
-                    <div class="mb-4 p-3 border rounded bg-light d-none" id="theory_toggle_block">
-                        <div class="form-check form-switch">
-                            {{ form.include_site_theory }}
-                            <label class="form-check-label fw-bold">📚 Подключить теорию с сайта</label>
-                        </div>
-                    </div>
-
                     <div class="mb-3">
                         <label class="form-label fw-bold">Заголовок</label>
                         {{ form.title }}
@@ -84,6 +77,8 @@
                         {% if form.simulator_config.errors %}
                             <div class="text-danger small">⚠️ {{ form.simulator_config.errors.0 }}</div>
                         {% endif %}
+                        <div id="sim_settings_box" class="mt-3 p-3 border rounded bg-white d-none"></div>
+                        {{ form.simulator_settings }}
                     </div>
 
                     <div class="mb-4 card bg-light p-3" id="files_block">
@@ -168,6 +163,8 @@
 }
 </style>
 
+<script src="{% static 'js/picker_ui.js' %}"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- КОНСТАНТЫ И НАСТРОЙКИ ---
@@ -188,6 +185,65 @@ document.addEventListener('DOMContentLoaded', function() {
     const addFileBtn = document.getElementById('add-file-btn');
     const fileContainer = document.getElementById('file-forms-container');
     const totalFormsInput = document.getElementById('id_files-TOTAL_FORMS');
+        const settingsInput = document.getElementById('id_simulator_settings');
+    const settingsBox = document.getElementById('sim_settings_box');
+    const homeworkFormEl = document.getElementById('homework-form');
+    let configPickers = {};
+    let settingsValid = true;
+
+    function readSettings() {
+        try { return JSON.parse(settingsInput.value) || {}; } catch (e) { return {}; }
+    }
+
+    function renderSettings() {
+        const configSelect = document.getElementById('id_simulator_config');
+        const picker = configSelect && configSelect.value ? configPickers[String(configSelect.value)] : null;
+
+        if (!picker) {
+            settingsBox.classList.add('d-none');
+            settingsBox.innerHTML = '';
+            settingsInput.value = '';
+            settingsValid = true;
+            return;
+        }
+
+        settingsBox.classList.remove('d-none');
+
+        let sel = readSettings();
+        // Если настройки еще не заполнены (при автовыборе), подставляем дефолтные значения из схемы
+        if (Object.keys(sel).length === 0 && picker) {
+            if (picker.key && picker.default !== undefined) {
+                sel[picker.key] = picker.default;
+            }
+            // Устанавливаем уровень сложности ТОЛЬКО если 'chain' входит в выбранные операции
+            if (picker.level && picker.level.key && picker.level.default !== undefined) {
+                const ops = sel[picker.key];
+                const shownWhen = picker.level.shown_when;
+                if (!shownWhen || (Array.isArray(ops) && ops.includes(shownWhen)) || ops === shownWhen) {
+                    sel[picker.level.key] = picker.level.default;
+                }
+            }
+            settingsInput.value = JSON.stringify(sel);
+        }
+
+        PickerUI.render(settingsBox, picker, sel, (selected, ok) => {
+            settingsInput.value = JSON.stringify(selected);
+            settingsValid = ok;
+        });
+    }
+
+    document.getElementById('id_simulator_config')?.addEventListener('change', function () {
+        settingsInput.value = '';          // другой конфиг, прежние настройки не подходят
+        renderSettings();
+    });
+
+    homeworkFormEl?.addEventListener('submit', function (e) {
+        const simVisible = !document.getElementById('simulator_block')?.classList.contains('d-none');
+        if (simVisible && !settingsValid) {
+            e.preventDefault();
+            alert('Выберите хотя бы один тип операций.');
+        }
+    });
 
     // --- 1. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
@@ -212,21 +268,6 @@ document.addEventListener('DOMContentLoaded', function() {
             addFileBtn.classList.toggle('disabled', isLimit);
             addFileBtn.innerText = isLimit ? "Лимит 10 файлов исчерпан" : "+ Добавить еще файл";
         }
-    }
-
-    function reindexFileRows() {
-        const rows = fileContainer.querySelectorAll('.file-form-row');
-        rows.forEach((row, index) => {
-            row.querySelectorAll('input, select, textarea, label').forEach(el => {
-                if (el.name) el.name = el.name.replace(/files-\d+-/g, `files-${index}-`);
-                if (el.id) el.id = el.id.replace(/files-\d+-/g, `files-${index}-`);
-                if (el.getAttribute('for')) {
-                    el.setAttribute('for', el.getAttribute('for').replace(/files-\d+-/g, `files-${index}-`));
-                }
-            });
-        });
-        if (totalFormsInput) totalFormsInput.value = rows.length;
-        updateAddButtonState();
     }
 
     // --- 2. ЛОГИКА ТЕМ И РАЗДЕЛОВ (Без изменений) ---
@@ -274,33 +315,81 @@ document.addEventListener('DOMContentLoaded', function() {
                 const hasTheory = this.getAttribute('data-has-theory') === 'True';
                 if (hiddenTopicInput) hiddenTopicInput.value = topicId;
                 if (titleInput && !titleInput.value) titleInput.value = topicTitle;
-                const theoryBlock = document.getElementById('theory_toggle_block');
-                if (theoryBlock) theoryBlock.classList.toggle('d-none', !hasTheory);
-                handleTypeAndConfigs(topicId);
+                window._topicHasTheory = hasTheory;
+                applyType(topicId);
             });
         });
     }
 
-    function handleTypeAndConfigs(topicId) {
-        const selectedType = typeSelect.value;
-        const simulatorBlock = document.getElementById('simulator_block');
-        if (selectedType === 'simulator' || selectedType === 'exam') {
-            simulatorBlock?.classList.remove('d-none');
-            if (topicId) loadConfigs(topicId);
-        } else { simulatorBlock?.classList.add('d-none'); }
-    }
+    const TYPE_RULES = {
+    theory:             { files: true,  sim: false },
+    practice:           { files: true,  sim: false },
+    interactive_theory: { files: false, sim: false },
+    simulator:          { files: false, sim: true  },
+};
 
-    function loadConfigs(topicId) {
-        const configSelect = document.getElementById('id_simulator_config');
-        if (!configSelect) return;
-        const currentVal = configSelect.value;
-        fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(res => res.json()).then(data => {
-            configSelect.innerHTML = '<option value="">---------</option>';
-            data.forEach(c => configSelect.add(new Option(c.label, c.id)));
-            if (currentVal) configSelect.value = currentVal;
-        });
+    function applyType() {
+        const rule = TYPE_RULES[typeSelect.value] || TYPE_RULES.theory;
+        document.getElementById('files_block')?.classList.toggle('d-none', !rule.files);
+        document.getElementById('simulator_block')?.classList.toggle('d-none', !rule.sim);
+        if (rule.sim && hiddenTopicInput?.value) loadConfigs(hiddenTopicInput.value);
+
+        // Подсказка, если выбрана интерактивная теория, а у темы теории нет
+        let hint = document.getElementById('theory_hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'theory_hint';
+            hint.className = 'text-warning small mt-1 d-none';
+            hint.textContent = '⚠️ У выбранной темы нет теории на сайте.';
+            typeSelect.parentElement.appendChild(hint);
+        }
+        hint.classList.toggle('d-none',
+            !(typeSelect.value === 'interactive_theory' && window._topicHasTheory === false));
     }
+    typeSelect?.addEventListener('change', applyType);
+
+function hasPicker(c) {
+    const p = c && c.picker;
+    if (!p || typeof p !== 'object') return false;
+    if (Array.isArray(p)) return p.length > 0;
+    return Object.keys(p).length > 0;
+}
+
+function loadConfigs(topicId) {
+    const configSelect = document.getElementById('id_simulator_config');
+    if (!configSelect) return;
+    const previousVal = String(configSelect.value || '');
+
+    fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(res => res.json())
+    .then(data => {
+        configSelect.innerHTML = '<option value="">---------</option>';
+        configPickers = {};
+
+        const configs = Array.isArray(data) ? data : (data.configs || data.results || data.data || []);
+
+        configs.forEach(c => {
+            configSelect.add(new Option(c.label, c.id));
+            configPickers[String(c.id)] = c.picker;
+        });
+
+        // 1. Сохраняем прежний выбор, только если он есть среди новых конфигов
+        const previousIsValid = previousVal && configs.some(c => String(c.id) === previousVal);
+        if (previousIsValid) {
+            configSelect.value = previousVal;
+        } else {
+            // 2. Автовыбор — только для конфигов с picker (таблица умножения, умножение/деление).
+            //    Для сложения/вычитания (без picker) оставляем пусто — значения по умолчанию нет.
+            const pickerConfig = configs.find(hasPicker);
+            configSelect.value = pickerConfig ? String(pickerConfig.id) : '';
+        }
+
+        renderSettings();
+    })
+    .catch(err => {
+        console.error('Ошибка при загрузке конфигураций:', err);
+    });
+}
 
     // --- 3. ЛОГИКА ФАЙЛОВ (ИСПРАВЛЕННАЯ) ---
 
@@ -392,6 +481,7 @@ fileContainer.addEventListener('click', function(e) {
         window._pendingTopicId = hiddenTopicInput.value;
         subjectSelect.dispatchEvent(new Event('change'));
     }
+    applyType();
     updateAddButtonState();
 
     setTimeout(() => {

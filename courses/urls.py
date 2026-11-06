@@ -43,6 +43,7 @@ urlpatterns = [
 
     # math
     path('math', courses_views.math_index, name='math_index'),
+    path('ajax/generate-tasks/', courses_views.generate_tasks_api, name='ajax_generate_tasks'),
     # универсальная страница тренажеров и теории
     path('topic/<int:topic_id>/', courses_views.topic_detail, name='topic_detail'),
     # сохранение результатов

@@ -70,6 +70,8 @@
                                                 <small class="text-primary"><i class="bi bi-cpu me-1"></i> Тренажер</small>
                                             {% elif hw.hw_type == 'theory' %}
                                                 <small class="text-info"><i class="bi bi-book me-1"></i> Теория</small>
+                                            {% elif hw.hw_type == 'interactive_theory' %}
+                                                <small class="text-success"><i class="bi bi-mortarboard me-1"></i> Интерактивная теория</small>
                                             {% else %}
                                                 <small class="text-secondary"><i class="bi bi-journal-text me-1"></i> Практика</small>
                                             {% endif %}
@@ -83,7 +85,7 @@
                         <div class="col-md-4 text-md-end mt-3 mt-md-0">
                             {% if hw.is_completed %}
                                 <div class="mb-2">
-                                    {% if hw.hw_type == 'theory' %}
+                                    {% if hw.hw_type == 'theory' or hw.hw_type == 'interactive_theory' %}
                                         {# Для теории вместо баллов показываем иконку успеха #}
                                         <span class="badge bg-success px-3 py-2 rounded-pill">
                                             <i class="bi bi-check-all me-1"></i> Материал изучен

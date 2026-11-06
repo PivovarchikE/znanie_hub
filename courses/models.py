@@ -4,6 +4,7 @@ from operator import attrgetter
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+from django.utils import timezone
 from users.models import User, BaseModel, SchoolClass, StudentProfile, TeacherProfile
 
 
@@ -116,10 +117,13 @@ class TrainingSession(BaseModel):
 
 class Homework(BaseModel):
     TYPE_CHOICES = [
-        ('theory', 'Теория'),
+        ('theory', 'Теория (файлы/текст)'),
+        ('interactive_theory', 'Интерактивная теория'),
         ('practice', 'Практика'),
         ('simulator', 'Тренажер'),
     ]
+    FILE_TYPES = ('theory', 'practice')                 # проверяет учитель вручную
+    AUTO_TYPES = ('interactive_theory', 'simulator')    # проверяются автоматически
 
     STATUS_CHOICES = [
         ('pending', 'Ждет решения'),
@@ -143,13 +147,19 @@ class Homework(BaseModel):
                                 blank=True)
     topic = models.ForeignKey('courses.Topic', on_delete=models.CASCADE, null=True, verbose_name="Тема")
     hw_type = models.CharField("Тип задания", max_length=20, choices=TYPE_CHOICES)
-    include_site_theory = models.BooleanField(
-        default=False,
-        verbose_name="Включить теорию с сайта"
-    )
     title = models.CharField("Название", max_length=255)
     content = models.TextField("Содержание (текст)", blank=True, null=True)
     simulator_config = models.ForeignKey('courses.SimulatorConfig', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Конфигурация тренажера")
+    simulator_settings = models.JSONField("Настройки тренажера", null=True, blank=True)
+    batch_id = models.UUIDField(null=True, blank=True, db_index=True, editable=False)
+
+    @property
+    def simulator_settings_label(self):
+        """Человекочитаемое описание настроек, напр. «Умножение на 7»."""
+        if self.hw_type != 'simulator' or not self.simulator_settings or not self.simulator_config_id:
+            return ''
+        from courses.generators import describe_selection
+        return describe_selection(self.simulator_config.params, self.simulator_settings)
     score = models.PositiveIntegerField(default=0)
     deadline = models.DateTimeField("Срок сдачи", null=True, blank=True)
     is_completed = models.BooleanField(default=False)
@@ -167,23 +177,42 @@ class Homework(BaseModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     teacher_comment = models.TextField("Комментарий учителя", blank=True, null=True)
 
+    @property
+    def is_auto_checked(self):
+        return self.hw_type in self.AUTO_TYPES
+
+    @property
+    def uses_files(self):
+        return self.hw_type in self.FILE_TYPES
+
+    @property
+    def needs_score(self):
+        return self.hw_type == 'practice'
+
+    def complete_automatically(self, percent):
+        """Для интерактивной теории и тренажера."""
+        self.status = 'completed'
+        self.is_completed = True
+        self.score = percent
+        self.actual_score = round(percent / 10)
+        if self.hw_type == 'interactive_theory':
+            self.is_theory_read = True
+        self.save()
+
     def get_status_for_student(self, student_user):
         if self.hw_type == 'simulator':
             return TrainingSession.objects.filter(
-                student=student_user,
-                config=self.simulator_config,
-                end_time__isnull=False
+                student=student_user, config=self.simulator_config, end_time__isnull=False
             ).exists()
-
         if self.hw_type == 'practice':
-            # Выполнено, если учитель проставил балл
             return self.actual_score is not None
-
-        if self.hw_type == 'theory':
-            # Выполнено, если есть отметка о прочтении или включена теория с сайта
+        if self.hw_type in ('theory', 'interactive_theory'):
             return self.is_theory_read
-
         return self.is_completed
+
+    @property
+    def is_overdue(self):
+        return bool(self.deadline and not self.is_completed and self.deadline < timezone.now())
 
 
 class HomeworkFile(BaseModel):
