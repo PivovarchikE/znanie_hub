@@ -217,6 +217,23 @@ class Command(BaseCommand):
                     defaults={'params': params, 'config_type': 'practice'}
                 )
 
+        # --- ТРЕНАЖЕРЫ: ТАБЛИЦА УМНОЖЕНИЯ и УМНОЖЕНИЕ/ДЕЛЕНИЕ ---
+        mult_topic = Topic.objects.filter(section=section_arithmetic, title="Таблица умножения").first()
+        if mult_topic:
+            SimulatorConfig.objects.get_or_create(
+                topic=mult_topic, label="Таблица умножения",
+                defaults={'config_type': 'practice',
+                          'params': {"kind": "multiplication_table", "count": 20, "all_count": 40}},
+            )
+
+        md_topic = Topic.objects.filter(section=section_arithmetic, title="Умножение и деление").first()
+        if md_topic:
+            SimulatorConfig.objects.get_or_create(
+                topic=md_topic, label="Умножение и деление",
+                defaults={'config_type': 'practice',
+                          'params': {"kind": "multiplication_division", "count": 20}},
+            )
+
         self.stdout.write(self.style.SUCCESS("База данных успешно заполнена!"))
 
     def _fill_hierarchy(self, subject, parent_sec, structure):

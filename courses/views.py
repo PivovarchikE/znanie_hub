@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import uuid
 
@@ -7,19 +8,20 @@ from PIL import Image
 from django.contrib import messages
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files import File
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import logger
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from courses.forms import HomeworkForm, HomeworkFileFormSet, GroupHomeworkForm
+from courses.forms import HomeworkForm, HomeworkFileFormSet
 from courses.models import Subject, Topic, TrainingSession, SimulatorConfig, Homework, Section, HomeworkResponseFile, \
     HomeworkComment, HomeworkFile
-from courses.services import generate_math_tasks_addition_and_substraction
+from courses.generators import generate_tasks, get_picker
 from decorators import ajax_required
 from users.models import StudentGroup
 from users.forms import StudentProfileForm, StudentEditForm, PhoneFormSet
@@ -29,6 +31,20 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+def _files_valid(form, formset):
+    """Для типов без файлов формсет не проверяем и не сохраняем."""
+    hw_type = form.cleaned_data.get('hw_type')
+    return True if hw_type not in Homework.FILE_TYPES else formset.is_valid()
+
+
+def _group_batch(group, teacher, hw):
+    """Все ДЗ одного назначения группе (старые записи без batch_id ищем по полям)."""
+    if hw.batch_id:
+        return Homework.objects.filter(group=group, teacher=teacher, batch_id=hw.batch_id)
+    return Homework.objects.filter(group=group, teacher=teacher, batch_id__isnull=True,
+                                   title=hw.title, subject=hw.subject, hw_type=hw.hw_type)
 
 
 @require_GET
@@ -66,30 +82,37 @@ def topic_detail(request, topic_id):
     current_homework = None
 
     # Домашнее задание подтягиваем только для авторизованного ученика-владельца
+    is_teacher_preview = False
     if homework_id and homework_id.isdigit() and request.user.is_authenticated:
         current_homework = Homework.objects.filter(
+            Q(student__user=request.user) | Q(teacher__user=request.user),
             id=homework_id,
-            student__user=request.user
-        ).first()
+        ).select_related('student__user', 'teacher__user').first()
 
         if current_homework:
-            is_completed = current_homework.is_completed
+            is_teacher_preview = current_homework.student.user_id != request.user.id
+            is_completed = current_homework.is_completed and not is_teacher_preview
             if not preset_config_id and current_homework.simulator_config:
                 preset_config_id = str(current_homework.simulator_config.id)
 
     all_problems_data = {}
 
+    hw_settings = None
+    if current_homework and current_homework.hw_type == 'simulator':
+        hw_settings = current_homework.simulator_settings or None
+
     for conf in all_configs:
-        # Логика генерации (случайные или фиксированные)
+        fixed_by_hw = bool(hw_settings) and conf.id == current_homework.simulator_config_id
         if conf.config_type == 'exam':
             problems = conf.params.get('fixed_tasks', [])
         else:
-            problems = generate_math_tasks_addition_and_substraction(conf.params)
+            problems = generate_tasks(conf.params, hw_settings if fixed_by_hw else None)
 
         all_problems_data[str(conf.id)] = {
             'label': conf.label,
             'config_type': conf.config_type,
-            'problems': problems
+            'problems': problems,
+            'picker': None if fixed_by_hw else get_picker(conf.params),
         }
 
     raw_content = topic.text_content or ""
@@ -103,6 +126,9 @@ def topic_detail(request, topic_id):
         'practice_configs': all_configs.filter(config_type='practice'),
         'exam_configs': all_configs.filter(config_type='exam'),
         'all_configs_json': all_problems_data,
+        'homework_settings_label': current_homework.simulator_settings_label if current_homework else '',
+        'is_teacher_preview': is_teacher_preview,
+        'homework_type': current_homework.hw_type if current_homework else None,
 
         # Данные для JS-скрипта тренажера
         'preset_config_id': preset_config_id,
@@ -114,72 +140,81 @@ def topic_detail(request, topic_id):
     return render(request, 'topic_universal_view.html', context)
 
 
+@require_GET
+@ajax_required
+def generate_tasks_api(request):
+    """Генерирует задания по выбору ученика (какая таблица, какие операции и т.д.)."""
+    conf = get_object_or_404(SimulatorConfig, pk=request.GET.get('config_id') or 0, config_type='practice')
+    selection = {}
+    if 'factor' in request.GET:
+        selection['factor'] = request.GET['factor']
+    if 'operations' in request.GET:
+        selection['operations'] = [o for o in request.GET['operations'].split(',') if o]
+    if 'level' in request.GET:
+        selection['level'] = request.GET['level']
+    return JsonResponse({'problems': generate_tasks(conf.params, selection)})
+
+
 @login_required
 @require_http_methods(["POST"])
 def save_training_result(request):
     try:
         data = json.loads(request.body)
-        homework_id = data.get('homework_id')
-        is_theory_only = data.get('is_theory_only', False)
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': 'bad json'}, status=400)
 
-        # --- БЛОК ОБРАБОТКИ ТЕОРИИ ---
-        if is_theory_only and homework_id:
-            homework = Homework.objects.filter(
-                id=homework_id,
-                student__user=request.user
-            ).first()
+    try:
+        hw = None
+        if data.get('homework_id'):
+            hw = (Homework.objects
+                  .filter(Q(student__user=request.user) | Q(teacher__user=request.user),
+                          id=data['homework_id'])
+                  .select_related('student__user').first())
+            if not hw:
+                return JsonResponse({'status': 'error', 'message': 'ДЗ не найдено'}, status=404)
 
-            if homework:
-                if homework.is_completed:
-                    return JsonResponse({'status': 'success', 'message': 'Уже выполнено'})
+            # Учитель проходит задание как предпросмотр: ничего не сохраняем
+            if hw.student.user_id != request.user.id:
+                return JsonResponse({'status': 'success', 'preview': True})
 
-                homework.is_completed = True
-                homework.score = 100
-                homework.save()
-                logger.info(f"Теория ДЗ {homework_id} отмечена как прочитанная для {request.user}")
-                return JsonResponse({'status': 'success'})
-            return JsonResponse({'status': 'error', 'message': 'ДЗ не найдено'}, status=404)
+            if hw.uses_files:
+                return JsonResponse({'status': 'error',
+                                     'message': 'Это задание проверяет учитель'}, status=400)
+            if hw.is_completed:
+                return JsonResponse({'status': 'error', 'message': 'Задание уже выполнено'}, status=403)
 
-        # --- СТАНДАРТНАЯ ЛОГИКА ТРЕНАЖЕРА ---
-        # Создаем запись о тренировке
-        session = TrainingSession.objects.create(
-            student=request.user,
-            config_id=data.get('config_id'),
-            total_questions=data.get('total', 0),
-            solved_count=data.get('total', 0),
-            correct_count=data.get('correct', 0),
-            detailed_results=data.get('details', []),
-            end_time=timezone.now()
-        )
+        # Интерактивная теория: просто отметка о прохождении
+        if data.get('is_theory_only'):
+            if hw and hw.hw_type == 'interactive_theory':
+                hw.complete_automatically(100)
+            elif hw:
+                return JsonResponse({'status': 'error', 'message': 'Неверный тип задания'}, status=400)
+            return JsonResponse({'status': 'success'})
 
-        total = session.total_questions
-        correct = session.correct_count
-        percent = int((correct / total) * 100) if total > 0 else 0
+        if hw and hw.hw_type != 'simulator':
+            return JsonResponse({'status': 'error', 'message': 'Неверный тип задания'}, status=400)
+        if hw and str(hw.simulator_config_id) != str(data.get('config_id')):
+            return JsonResponse({'status': 'error', 'message': 'Неверный конфиг'}, status=400)
 
-        # Обработка ДЗ для тренажера
-        if homework_id:
-            homework = Homework.objects.filter(
-                id=homework_id,
-                student__user=request.user
-            ).first()
-
-            if homework:
-                # Проверка на соответствие конфига (только для тренажеров)
-                if str(homework.simulator_config_id) != str(data.get('config_id')):
-                    return JsonResponse({'status': 'error', 'message': 'Неверный конфиг'}, status=400)
-
-                if homework.is_completed:
-                    return JsonResponse({'status': 'error', 'message': 'Задание уже выполнено'}, status=403)
-
-                homework.is_completed = True
-                homework.score = percent
-                homework.save()
+        with transaction.atomic():
+            session = TrainingSession.objects.create(
+                student=request.user,
+                config_id=data.get('config_id'),
+                total_questions=data.get('total', 0),
+                solved_count=data.get('total', 0),
+                correct_count=data.get('correct', 0),
+                detailed_results=data.get('details', []),
+                end_time=timezone.now(),
+            )
+            if hw:
+                total = session.total_questions
+                percent = int(session.correct_count / total * 100) if total else 0
+                hw.complete_automatically(percent)
 
         return JsonResponse({'status': 'success'})
-
     except Exception as e:
-        logger.error(f"Save training result error: {e}")
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        logger.error(f"Save training result error: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=500)
 
 
 @login_required
@@ -272,9 +307,11 @@ def get_section_accordion(request):
 @require_GET
 @ajax_required
 def get_configs(request):
-    topic_id = request.GET.get('topic_id')
-    configs = SimulatorConfig.objects.filter(topic_id=topic_id).values('id', 'label')
-    return JsonResponse(list(configs), safe=False)
+    configs = SimulatorConfig.objects.filter(topic_id=request.GET.get('topic_id'))
+    return JsonResponse(
+        [{'id': c.id, 'label': c.label, 'picker': get_picker(c.params)} for c in configs],
+        safe=False,
+    )
 
 
 @login_required
@@ -337,7 +374,7 @@ def add_homework_view(request, student_id):
         form = HomeworkForm(request.POST)
         formset = HomeworkFileFormSet(request.POST, request.FILES, prefix='files')
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid() and _files_valid(form, formset):
             try:
                 with transaction.atomic():
                     homework = form.save(commit=False)
@@ -345,16 +382,13 @@ def add_homework_view(request, student_id):
                     homework.teacher = request.user.teacher_profile
                     homework.save()
 
-                    form.save_m2m()  # Для тегов или других ManyToMany
-
                     # Сохранение файлов
-                    instances = formset.save(commit=False)
-                    for instance in instances:
-                        instance.homework = homework
-                        instance.save()
-                        logger.debug(f"File attached: HW_ID={homework.id}, File={instance.file.name}")
+                    if homework.uses_files:
+                        for instance in formset.save(commit=False):
+                            instance.homework = homework
+                            instance.save()
+                            logger.debug(f"File attached: HW_ID={homework.id}, File={instance.file.name}")
 
-                    formset.save_m2m()
 
                 logger.info(
                     f"SUCCESS: HW ID {homework.id} created for Student {student.user.id} by Teacher {request.user.id}")
@@ -390,19 +424,21 @@ def homework_view_detail(request, hw_id):
     homework = get_object_or_404(
         Homework.objects.filter(
             Q(student__user=request.user) | Q(teacher__user=request.user)
-        ).select_related(
-            'student__user',
-            'teacher__user',
-            'topic',
-            'subject',
-            'section',
-            'simulator_config'
-        ).prefetch_related(
-            'files'
-        ),
-        id=hw_id
+        ).select_related('student__user', 'teacher__user', 'topic', 'subject',
+                         'section', 'simulator_config').prefetch_related('files'),
+        id=hw_id,
     )
-    return render(request, 'homework_view_detail.html', {'homework': homework})
+    is_teacher = homework.teacher.user_id == request.user.id
+
+    launch_url = None
+    if homework.is_auto_checked and homework.topic_id:
+        launch_url = f"{reverse('topic_detail', args=[homework.topic_id])}?hw={homework.id}"
+        if homework.simulator_config_id:
+            launch_url += f"&config={homework.simulator_config_id}"
+
+    return render(request, 'homework_view_detail.html', {
+        'homework': homework, 'is_teacher': is_teacher, 'launch_url': launch_url,
+    })
 
 
 @login_required
@@ -417,10 +453,20 @@ def edit_homework_view(request, hw_id):
     if request.method == 'POST':
         form = HomeworkForm(request.POST, instance=homework)
         formset = HomeworkFileFormSet(request.POST, request.FILES, instance=homework, prefix='files')
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid() and _files_valid(form, formset):
             with transaction.atomic():
-                form.save()
-                formset.save()
+                homework = form.save(commit=False)
+                homework.student = student
+                homework.teacher = request.user.teacher_profile
+                homework.save()
+                if homework.uses_files:
+                    for instance in formset.save(commit=False):
+                        instance.homework = homework
+                        instance.save()
+                    for obj in formset.deleted_objects:
+                        obj.delete()
+                else:
+                    homework.files.all().delete()
             return redirect('student_detail', student_id=student.id)
     else:
         form = HomeworkForm(instance=homework)
@@ -494,17 +540,21 @@ def upload_hw_response(request, hw_id):
 @require_POST
 def grade_homework(request, hw_id):
     homework = get_object_or_404(Homework, id=hw_id, teacher__user=request.user)
+    if homework.is_auto_checked:
+        messages.error(request, "Это задание проверяется автоматически.")
+        return redirect('homework_view_detail', hw_id=hw_id)
 
     action = request.POST.get('action')
     comment_text = (request.POST.get('teacher_comment') or '').strip()
     raw_score = (request.POST.get('actual_score') or '').strip()
 
-    if action not in ('accept', 'reject'):
+    # Разрешаем действие 'correction' (и 'reject' на всякий случай)
+    if action not in ('accept', 'correction', 'reject'):
         messages.error(request, "Неизвестное действие.")
         return redirect('homework_view_detail', hw_id=hw_id)
 
     score = None
-    if raw_score:
+    if raw_score and action == 'accept':
         try:
             score = int(raw_score)
         except ValueError:
@@ -513,11 +563,12 @@ def grade_homework(request, hw_id):
             messages.error(request, "Балл должен быть целым числом от 0 до 10.")
             return redirect('homework_view_detail', hw_id=hw_id)
 
-    if action == 'accept' and score is None:
+    if action == 'accept' and homework.needs_score and score is None:
         messages.error(request, "Необходимо выставить балл для принятия работы.")
         return redirect('homework_view_detail', hw_id=hw_id)
 
     with transaction.atomic():
+        # Комментарий учителя сохраняется в любом случае
         if comment_text:
             HomeworkComment.objects.create(
                 homework=homework, author=request.user, text=comment_text
@@ -526,14 +577,21 @@ def grade_homework(request, hw_id):
         if action == 'accept':
             homework.status = 'completed'
             homework.is_completed = True
-            homework.actual_score = score
-        else:
+            if homework.hw_type == 'theory':
+                homework.is_theory_read = True
+            else:
+                homework.actual_score = score
+        elif action in ('correction', 'reject'):
+            # Логика отправки на доработку
             homework.status = 'correction'
             homework.is_completed = False
-            if score is not None:
-                homework.actual_score = score
+            if homework.hw_type == 'theory':
+                homework.is_theory_read = False
+            else:
+                homework.actual_score = None
 
         homework.save()
+        messages.success(request, "Статус задания успешно обновлен.")
 
     return redirect('homework_view_detail', hw_id=hw_id)
 
@@ -557,7 +615,7 @@ def mark_theory_read(request, hw_id):
 @require_http_methods(['POST', 'GET'])
 def submit_homework(request, hw_id):
     homework = get_object_or_404(Homework, id=hw_id, student__user=request.user)
-    if request.method == 'POST':
+    if request.method == 'POST' and homework.uses_files and not homework.is_completed:
         comment_text = request.POST.get('student_comment')
         if comment_text:
             HomeworkComment.objects.create(
@@ -726,7 +784,7 @@ def search_students_and_groups_api(request):
     teacher = request.user.teacher_profile
 
     students = StudentProfile.objects.filter(teachers=teacher)
-    groups = StudentGroup.objects.filter(teacher=teacher, is_active=True)
+    groups = StudentGroup.objects.filter(teacher=teacher, status='active')
 
     if query:
         students = students.filter(
@@ -770,15 +828,12 @@ def group_add_hw_view(request, group_id):
     if request.method == 'POST':
         form = HomeworkForm(request.POST)
 
-        # 1. Получаем выбранные ID учеников из чекбоксов
         selected_student_ids = [int(sid) for sid in request.POST.getlist('selected_students') if sid.isdigit()]
         target_students = all_students.filter(id__in=selected_student_ids)
 
-        # Валидация: должен быть выбран хотя бы один ученик
         if not selected_student_ids:
             messages.error(request, "Выберите хотя бы одного ученика для назначения домашнего задания.")
 
-        # Динамически расширяем queryset для topic и section при POST
         topic_id = request.POST.get('topic')
         section_id = request.POST.get('section')
 
@@ -789,8 +844,13 @@ def group_add_hw_view(request, group_id):
 
         formset = HomeworkFileFormSet(request.POST, request.FILES, prefix='files')
 
-        if selected_student_ids and form.is_valid() and formset.is_valid():
+        # Проверяем файлы с учетом типа задания (как для индивидуального ДЗ)
+        hw_type = form.data.get('hw_type')
+        files_valid = True if hw_type not in Homework.FILE_TYPES else formset.is_valid()
+
+        if selected_student_ids and form.is_valid() and files_valid:
             with transaction.atomic():
+                batch_id = uuid.uuid4()
                 created_homeworks = []
                 for student in target_students:
                     hw = Homework(
@@ -801,52 +861,49 @@ def group_add_hw_view(request, group_id):
                         title=form.cleaned_data.get('title'),
                         content=form.cleaned_data.get('content'),
                         simulator_config=form.cleaned_data.get('simulator_config'),
+                        batch_id=batch_id,
                         deadline=form.cleaned_data.get('deadline'),
-                        include_site_theory=form.cleaned_data.get('include_site_theory', False),
                         teacher=teacher_profile,
                         student=student,
                         group=group,
-                        status='pending'
+                        status='pending',
+                        simulator_settings=form.cleaned_data.get('simulator_settings'),
                     )
                     created_homeworks.append(hw)
 
                 created_homeworks = Homework.objects.bulk_create(created_homeworks)
 
-                files_to_save = [
-                    f.cleaned_data.get('file')
-                    for f in formset.forms
-                    if f.cleaned_data and f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False)
-                ]
+                # Собираем файлы из валидного формсета (если тип задания их поддерживает)
+                files_to_save = []
+                if hw_type in Homework.FILE_TYPES and formset.is_valid():
+                    files_to_save = [
+                        f.cleaned_data.get('file')
+                        for f in formset.forms
+                        if f.cleaned_data and f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False)
+                    ]
 
+                # Безопасное сохранение файлов: для каждого ученика создается своя копия на диске,
+                # чтобы удаление у одного не стирало файл у других.
                 if files_to_save and created_homeworks:
                     for uploaded_file in files_to_save:
-                        first_file = HomeworkFile.objects.create(
-                            homework=created_homeworks[0],
-                            file=uploaded_file,
-                            original_name=uploaded_file.name
-                        )
-                        shared_files = [
-                            HomeworkFile(
+                        for hw in created_homeworks:
+                            uploaded_file.seek(0)
+                            HomeworkFile.objects.create(
                                 homework=hw,
-                                file=first_file.file.name,
+                                file=File(uploaded_file, name=uploaded_file.name),
                                 original_name=uploaded_file.name
                             )
-                            for hw in created_homeworks[1:]
-                        ]
-                        HomeworkFile.objects.bulk_create(shared_files)
 
-            messages.success(request,
-                             f'Домашнее задание успешно назначено {len(created_homeworks)} ученикам группы "{group.name}"!')
+            messages.success(request, f'Домашнее задание успешно назначено {len(created_homeworks)} ученикам группы "{group.name}"!')
             return redirect('group_detail', pk=group.pk)
         else:
-            if form.is_valid() and formset.is_valid() and not selected_student_ids:
-                pass  # Ошибка уже выведена выше через messages.error
+            if not selected_student_ids:
+                pass
             else:
                 messages.error(request, "Пожалуйста, исправьте ошибки в форме.")
     else:
         form = HomeworkForm()
         formset = HomeworkFileFormSet(prefix='files')
-        # По умолчанию выбираем всех учеников группы
         selected_student_ids = list(all_students.values_list('id', flat=True))
 
     return render(request, 'group_add_hw.html', {
@@ -867,29 +924,23 @@ def group_edit_hw_view(request, group_id, homework_id):
     group = get_object_or_404(StudentGroup, pk=group_id, teacher=teacher_profile)
     all_students = group.students.all()
 
-    # Находим базовое ДЗ
     base_hw = get_object_or_404(Homework, pk=homework_id, group=group, teacher=teacher_profile)
 
-    # Находим ВСЕ ДЗ учеников этой группы с таким же заголовком и предметом
-    group_homeworks = Homework.objects.filter(
-        group=group,
-        teacher=teacher_profile,
-        title=base_hw.title,
-        subject=base_hw.subject
-    )
-    if not group_homeworks.exists():
-        group_homeworks = Homework.objects.filter(pk=base_hw.pk)
+    group_homeworks = _group_batch(group, teacher_profile, base_hw)
+    if not base_hw.batch_id:
+        # старый пакет без номера: присваиваем ему номер один раз
+        new_batch = uuid.uuid4()
+        group_homeworks.update(batch_id=new_batch)
+        base_hw.batch_id = new_batch
+        group_homeworks = _group_batch(group, teacher_profile, base_hw)
 
     if request.method == 'POST':
         form = HomeworkForm(request.POST, instance=base_hw)
-
-        # ID выбранных учеников из чекбоксов
         selected_student_ids = [int(sid) for sid in request.POST.getlist('selected_students') if sid.isdigit()]
 
         if not selected_student_ids:
             messages.error(request, "Выберите хотя бы одного ученика.")
 
-        # Расширяем queryset для dynamic AJAX validation
         topic_id = request.POST.get('topic')
         section_id = request.POST.get('section')
 
@@ -900,7 +951,10 @@ def group_edit_hw_view(request, group_id, homework_id):
 
         formset = HomeworkFileFormSet(request.POST, request.FILES, instance=base_hw, prefix='files')
 
-        if selected_student_ids and form.is_valid() and formset.is_valid():
+        hw_type = form.data.get('hw_type')
+        files_valid = True if hw_type not in Homework.FILE_TYPES else formset.is_valid()
+
+        if selected_student_ids and form.is_valid() and files_valid:
             with transaction.atomic():
                 updated_fields = {
                     'subject': form.cleaned_data.get('subject'),
@@ -911,26 +965,36 @@ def group_edit_hw_view(request, group_id, homework_id):
                     'content': form.cleaned_data.get('content'),
                     'simulator_config': form.cleaned_data.get('simulator_config'),
                     'deadline': form.cleaned_data.get('deadline'),
-                    'include_site_theory': form.cleaned_data.get('include_site_theory', False),
+                    'simulator_settings': form.cleaned_data.get('simulator_settings')
                 }
 
-                # 1. Удаляем ДЗ у учеников, с которых СНЯЛИ галочку
+                # 1. Удаляем ДЗ у учеников, с которых сняли галочку
                 removed_homeworks = group_homeworks.exclude(student_id__in=selected_student_ids)
                 if removed_homeworks.exists():
                     HomeworkFile.objects.filter(homework__in=removed_homeworks).delete()
-                    removed_homeworks.delete()
+                    for hw in removed_homeworks: hw.delete()
 
-                # 2. Обновляем существующие записи у тех, кто остался выбран
+                # 2. Обновляем существующие записи у выбранных учеников
                 remaining_homeworks = group_homeworks.filter(student_id__in=selected_student_ids)
                 remaining_homeworks.update(**updated_fields)
 
-                # 3. Сохраняем изменения файлов в base_hw
-                formset.save()
+                # 3. Сохраняем файлы в base_hw (если поддерживается)
+                if hw_type in Homework.FILE_TYPES:
+                    formset.save()
+                else:
+                    base_hw.files.all().delete()
 
-                # 4. Находим учеников, у которых ЕЩЕ НЕТ этого ДЗ, и создаем для них
-                assigned_student_ids = set(remaining_homeworks.values_list('student_id', flat=True))
-                new_student_ids = set(selected_student_ids) - assigned_student_ids
+                # 4. Жесткая защита от дубликатов: проверяем по БД, у кого из выбранных учеников
+                # УЖЕ ФАКТИЧЕСКИ ЕСТЬ задание из этого пакета, чтобы не плодить дубликаты
+                existing_student_ids = set(
+                    _group_batch(group, teacher_profile, base_hw)
+                    .filter(student_id__in=selected_student_ids)
+                    .values_list('student_id', flat=True)
+                )
 
+                new_student_ids = set(selected_student_ids) - existing_student_ids
+
+                # 5. Создаем новые записи только для тех учеников, у которых их действительно еще не было
                 if new_student_ids:
                     new_students = all_students.filter(id__in=new_student_ids)
                     new_hws = []
@@ -939,47 +1003,49 @@ def group_edit_hw_view(request, group_id, homework_id):
                             teacher=teacher_profile,
                             student=st,
                             group=group,
-                            created_at=base_hw.created_at,
+                            batch_id=base_hw.batch_id,
                             status='pending',
                             **updated_fields
                         ))
                     Homework.objects.bulk_create(new_hws)
 
-                # 5. Синхронизируем прикрепленные файлы со ВСЕМИ текущими ДЗ группы
-                all_current_homeworks = Homework.objects.filter(
-                    group=group,
-                    teacher=teacher_profile,
-                    title=form.cleaned_data.get('title'),
-                    subject=form.cleaned_data.get('subject')
-                )
+                # 6. Синхронизация файлов для остальных учеников группы
+                all_current_homeworks = _group_batch(group, teacher_profile, base_hw)
                 other_homeworks = all_current_homeworks.exclude(pk=base_hw.pk)
 
                 if other_homeworks.exists():
                     base_files = HomeworkFile.objects.filter(homework=base_hw)
                     HomeworkFile.objects.filter(homework__in=other_homeworks).delete()
 
-                    new_shared_files = []
-                    for hw in other_homeworks:
-                        for b_file in base_files:
-                            new_shared_files.append(
-                                HomeworkFile(
-                                    homework=hw,
-                                    file=b_file.file.name,
-                                    original_name=b_file.original_name
-                                )
-                            )
-                    if new_shared_files:
-                        HomeworkFile.objects.bulk_create(new_shared_files)
+                    if base_files.exists() and hw_type in Homework.FILE_TYPES:
+                        new_shared_files = []
+                        for hw in other_homeworks:
+                            for b_file in base_files:
+                                if b_file.file:
+                                    try:
+                                        b_file.file.open('rb')
+                                        file_copy = File(b_file.file, name=b_file.original_name or os.path.basename(
+                                            b_file.file.name))
+                                        new_shared_files.append(
+                                            HomeworkFile(
+                                                homework=hw,
+                                                file=file_copy,
+                                                original_name=b_file.original_name
+                                            )
+                                        )
+                                    except Exception:
+                                        pass
+                        if new_shared_files:
+                            HomeworkFile.objects.bulk_create(new_shared_files)
 
             messages.success(request, f'Домашнее задание для группы "{group.name}" успешно обновлено!')
             return redirect('group_detail', pk=group.pk)
         else:
-            if form.is_valid() and formset.is_valid() and not selected_student_ids:
+            if not selected_student_ids:
                 pass
             else:
                 messages.error(request, "Пожалуйста, исправьте ошибки в форме.")
     else:
-        # GET-запрос
         initial_data = {}
         if base_hw.topic:
             initial_data['subject'] = base_hw.topic.section.subject.id
@@ -996,8 +1062,6 @@ def group_edit_hw_view(request, group_id, homework_id):
             form.fields['topic'].queryset = Topic.objects.filter(section_id=base_hw.section_id)
 
         formset = HomeworkFileFormSet(instance=base_hw, prefix='files')
-
-        # Получаем точный список ID всех учеников, у которых в этой группе сейчас создано это ДЗ
         selected_student_ids = list(group_homeworks.values_list('student_id', flat=True))
 
     return render(request, 'group_add_hw.html', {
@@ -1022,13 +1086,7 @@ def group_delete_hw_view(request, group_id, homework_id):
     )
 
     with transaction.atomic():
-        batch = Homework.objects.filter(
-            group=group,
-            teacher=teacher_profile,
-            title=target_hw.title,
-            subject=target_hw.subject,
-            hw_type=target_hw.hw_type,
-        )
+        batch = _group_batch(group, teacher_profile, target_hw)
         for hw in batch:
             hw.delete()   # soft delete с каскадом по связанным объектам
 

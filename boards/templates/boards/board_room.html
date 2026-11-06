@@ -491,6 +491,20 @@
 .top-left-bar .tb-btn:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
 .top-left-bar .tb-btn:active:not(:disabled) { transform: scale(.92); }
 .top-left-bar .tb-btn.tb-danger:hover:not(:disabled) { background: #fee2e2; color: #dc2626; }
+/* Виртуальные Shift/Alt нужны только на сенсорных устройствах (планшет, телефон) */
+.top-left-bar .tb-touch-only { display: none; }
+@media (pointer: coarse) { .top-left-bar .tb-touch-only { display: inline-flex; } }
+.top-left-bar .tb-sep.tb-touch-only { display: none; }
+@media (pointer: coarse) { .top-left-bar .tb-sep.tb-touch-only { display: block; } }
+html.has-touch .top-left-bar .tb-btn.tb-touch-only { display: inline-flex; }
+html.has-touch .top-left-bar .tb-sep.tb-touch-only { display: block; }
+.top-left-bar .tb-btn.on, .top-left-bar .tb-btn.on:hover { background: #e0e7ff; color: #4f46e5; }
+/* Магнит перечёркнут, когда привязка отключена */
+#btnVAlt i { position: relative; }
+#btnVAlt.on i::after {
+    content: ''; position: absolute; left: -2px; right: -2px; top: 50%; height: 2px; border-radius: 2px;
+    background: currentColor; transform: rotate(-45deg);
+}
 .top-left-bar .tb-sep { width: 1px; height: 20px; background: rgba(15,23,42,.1); margin: 0 3px; }
 @media (max-width: 576px) { .top-left-bar { top: 60px; left: 8px; border-radius: 14px; } }
 
@@ -781,7 +795,7 @@
                 <button type="button" data-v="end" title="Стрелка на конце"><svg viewBox="0 0 40 20"><path d="M5 10 H29" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M27 4.5 L36 10 L27 15.5Z" fill="currentColor"/></svg></button>
                 <button type="button" data-v="both" title="Стрелки с обеих сторон"><svg viewBox="0 0 40 20"><path d="M11 10 H29" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M27 4.5 L36 10 L27 15.5Z" fill="currentColor"/><path d="M13 4.5 L4 10 L13 15.5Z" fill="currentColor"/></svg></button>
             </div>
-            <div class="pop-hint">Концы линий прилипают к вершинам и сторонам фигур. <b>Alt</b> — без привязки, <b>Shift</b> — угол кратный 15°.</div>
+            <div class="pop-hint">Концы линий прилипают к вершинам и сторонам фигур. <b>Alt</b> — без привязки (на планшете — кнопка <i class="bi bi-magnet"></i> слева сверху), <b>Shift</b> — угол кратный 15° (на планшете — кнопка <i class="bi bi-shift"></i> слева сверху).</div>
             <!-- Скрытые селекты хранят выбранные значения для кода рисования -->
             <select id="lineDash" class="d-none"><option value="solid">solid</option><option value="dashed">dashed</option><option value="dotted">dotted</option></select>
             <select id="lineArrow" class="d-none"><option value="none">none</option><option value="end">end</option><option value="both">both</option></select>
@@ -804,6 +818,15 @@
         </button>
         <button type="button" class="tb-btn" id="btnRedo" title="Повторить (Ctrl+Shift+Z или Ctrl+Y)" aria-label="Повторить" disabled>
             <i class="bi bi-arrow-return-right"></i>
+        </button>
+        <span class="tb-sep tb-touch-only"></span>
+        <!-- Виртуальный Shift: только для сенсорных устройств -->
+        <button type="button" class="tb-btn tb-touch-only" id="btnVShift" title="Shift для планшета: пропорции при изменении размера и углы кратные 15° для линий" aria-label="Режим Shift" aria-pressed="false">
+            <i class="bi bi-shift"></i>
+        </button>
+        <!-- Виртуальный Alt: отключает привязку линий к фигурам -->
+        <button type="button" class="tb-btn tb-touch-only" id="btnVAlt" title="Alt для планшета: рисовать линии без привязки к фигурам" aria-label="Без привязки" aria-pressed="false">
+            <i class="bi bi-magnet"></i>
         </button>
         {% if is_teacher %}
         <span class="tb-sep"></span>
@@ -1008,6 +1031,35 @@
     let isSoundEnabled = true;
     let timerInterval = null;
 
+    // === ВИРТУАЛЬНЫЙ SHIFT (планшеты и графические планшеты без клавиатуры) ===
+    // Включённая кнопка работает как зажатый Shift: пропорциональное изменение размера и углы линий кратные 15°.
+    // На ПК физический Shift по-прежнему работает (при включённой кнопке он, наоборот, даёт свободное масштабирование).
+    let virtualShift = false;
+    const btnVShift = document.getElementById('btnVShift');
+    function setVirtualShift(on) {
+        virtualShift = !!on;
+        canvas.uniformScaling = virtualShift;   // fabric: Shift инвертирует это значение
+        btnVShift.classList.toggle('on', virtualShift);
+        btnVShift.setAttribute('aria-pressed', String(virtualShift));
+    }
+    btnVShift.addEventListener('click', () => setVirtualShift(!virtualShift));
+    // Гибридные устройства: показываем кнопки после первого касания пальцем
+    window.addEventListener('pointerdown', function onTouch(e) {
+        if (e.pointerType !== 'touch') return;
+        document.documentElement.classList.add('has-touch');
+        window.removeEventListener('pointerdown', onTouch, true);
+    }, true);
+
+    // Виртуальный Alt: отключает привязку линий к вершинам и сторонам фигур
+    let virtualAlt = false;
+    const btnVAlt = document.getElementById('btnVAlt');
+    btnVAlt.addEventListener('click', () => {
+        virtualAlt = !virtualAlt;
+        btnVAlt.classList.toggle('on', virtualAlt);
+        btnVAlt.setAttribute('aria-pressed', String(virtualAlt));
+        if (virtualAlt) hideSnap();
+    });
+
     const currentUserId = "{{ request.user.id }}";
     const currentUserName = "{{ request.user.get_full_name|default:request.user.username }}";
 
@@ -1162,7 +1214,12 @@
     btnPencil.addEventListener('click', () => onToolClick('pencil'));
     btnMarker.addEventListener('click', () => onToolClick('marker'));
     btnLine.addEventListener('click', () => onToolClick('line'));
-    btnFrame.addEventListener('click', () => { addExportFrame(); refreshExportMenu(); });
+    btnFrame.addEventListener('click', () => {
+        // Рамку нужно сразу можно двигать: переключаемся на «Выбор» до её добавления
+        if (!exportFrame) { setActiveTool('select'); closePopover(); }
+        addExportFrame();
+        refreshExportMenu();
+    });
 
     colorPicker.addEventListener('input', (e) => {
         primaryColor = e.target.value;
@@ -1313,7 +1370,7 @@
                         img.scaleToWidth(300); // Базовый размер при вставке
 
                         // Центрируем картинку на экране
-                        const center = canvas.getCenter();
+                        const vc = canvas.getVpCenter(), center = { left: vc.x, top: vc.y };
                         img.set({
                             left: center.left,
                             top: center.top,
@@ -1321,6 +1378,8 @@
                             originY: 'center'
                         });
 
+                        setActiveTool('select');   // вставленную картинку сразу можно двигать
+                        closePopover();
                         canvas.add(img);
                         canvas.setActiveObject(img);
                         canvas.requestRenderAll();
@@ -1519,6 +1578,24 @@ function distanceToSegment(p, a, b) {
     return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
+// === Пересборка групп-фигур ===
+// Группа, восстановленная из JSON (ответ сервера, загрузка доски, отмена), может получить рамку,
+// не совпадающую с содержимым (рамка «уезжает» вправо, фигура сдвигается при кликах рядом, перестаёт
+// выделяться и стираться). Пересобираем группу конструктором: границы считаются заново по штрихам.
+function rebuildShapeGroup(g) {
+    if (!g || g.type !== 'group') return g;
+    const kids = g.getObjects().slice();
+    if (!kids.length || !kids.every(k => k.type === 'path')) return g;   // только фигуры из каталога (стрелки не трогаем)
+    const keep = { id: g.id, _isRemote: g._isRemote, selectable: g.selectable, evented: g.evented };
+    g._restoreObjectsState();                       // дочерние штрихи в абсолютные координаты
+    kids.forEach(k => { delete k.group; k.setCoords(); });
+    const ng = new fabric.Group(kids);
+    Object.keys(keep).forEach(key => { if (keep[key] !== undefined) ng[key] = keep[key]; });
+    if (g.opacity !== undefined && g.opacity !== 1) ng.set('opacity', g.opacity);
+    ng.setCoords();
+    return ng;
+}
+
 function pathCommandsToSegments(commands, stepsPerCurve = 10) {
     const segments = [];
     let current = { x: 0, y: 0 };
@@ -1591,6 +1668,11 @@ function pathCommandsToSegments(commands, stepsPerCurve = 10) {
             current = { ...start };
         }
     });
+    // «Точка» (клик пером/маркером) — путь нулевой длины. Все его отрезки отфильтрованы выше,
+    // из-за чего ластик его не видел. Оставляем вырожденный отрезок, чтобы точку можно было стереть.
+    if (!segments.length) {
+        segments.push([{ x: start.x, y: start.y }, { x: start.x, y: start.y }]);
+    }
     return segments;
 }
 
@@ -2243,7 +2325,7 @@ function eraseAlongSegment(start, end) {
     }
 
     function findSnapPoint(pt, e) {
-        if (e && e.altKey) return null;
+        if (virtualAlt || (e && e.altKey)) return null;
         const zoom = canvas.getZoom() || 1;
         const rv = SNAP_PX.vertex / zoom, rm = SNAP_PX.mid / zoom, re = SNAP_PX.edge / zoom;
         let bestV = null, dV = rv, bestM = null, dM = rm, bestE = null, dE = re;
@@ -2367,7 +2449,7 @@ canvas.on('mouse:move', function (o) {
     showSnap(snap);
     if (!isDrawingLine || !linePreview) return;
     if (snap) p = { x: snap.x, y: snap.y };
-    else if (o.e.shiftKey) p = snapToAngle(lineStart, p);
+    else if (o.e.shiftKey || virtualShift) p = snapToAngle(lineStart, p);
     linePreview.set({ x2: p.x, y2: p.y });
     linePreview.setCoords();
     canvas.requestRenderAll();
@@ -2380,7 +2462,7 @@ canvas.on('mouse:up', function (o) {
     let end = canvas.getPointer(o.e);
     const endSnap = findSnapPoint(end, o.e);
     if (endSnap) end = { x: endSnap.x, y: endSnap.y };
-    else if (o.e.shiftKey) end = snapToAngle(lineStart, end);
+    else if (o.e.shiftKey || virtualShift) end = snapToAngle(lineStart, end);
     hideSnap();
 
     if (linePreview) {
@@ -3002,9 +3084,11 @@ canvas.on('mouse:up', function (o) {
         shape.setPositionByOrigin(new fabric.Point(c.x, c.y), 'center', 'center');
         shape.setCoords();
 
+        // Сначала переключаемся на «Выбор» (снимает режим ластика/рисования), затем добавляем и выделяем фигуру
+        setActiveTool('select');
+        closePopover();
         canvas.add(shape);
         canvas.setActiveObject(shape);
-        setActiveTool('select');
         canvas.requestRenderAll();
     };
 
@@ -3398,8 +3482,10 @@ scheduleScrollbars();
         reader.onload = function(f) {
             fabric.Image.fromURL(f.target.result, function(img) {
                 img.scaleToWidth(300);
-                const center = canvas.getCenter();
-                img.set({ left: center.left, top: center.top });
+                const vc = canvas.getVpCenter(), center = { left: vc.x, top: vc.y };
+                img.set({ left: center.left, top: center.top, originX: 'center', originY: 'center' });
+                setActiveTool('select');   // загруженную картинку сразу можно двигать
+                closePopover();
                 canvas.add(img);
                 canvas.setActiveObject(img);
             });
@@ -3419,9 +3505,9 @@ scheduleScrollbars();
         }
 
         // Иначе создаем новую рамку
-        const center = canvas.getCenter();
+        const vc = canvas.getVpCenter(), center = { left: vc.x, top: vc.y };
         exportFrame = new fabric.Rect({
-            left: center.left - 200, top: center.top - 150, width: 400, height: 300,
+            left: center.left - 200, top: center.top - 150, width: 400 / canvas.getZoom(), height: 300 / canvas.getZoom(),
             fill: 'rgba(224, 231, 255, 0.2)', stroke: '#4f46e5', strokeWidth: 2, strokeDashArray: [6, 6]
         });
         canvas.add(exportFrame);
@@ -3908,8 +3994,10 @@ function renderSingleCursor(cursorEl, worldX, worldY) {
             canvas.requestRenderAll();
         }
     } else {
+        if (incomingObj.type === 'activeSelection') return;   // контейнер выделения — не объект доски
         fabric.util.enlivenObjects([incomingObj], function(enlivenedObjects) {
             enlivenedObjects.forEach(function(fabObj) {
+                fabObj = rebuildShapeGroup(fabObj);
                 fabObj.id = incomingObj.id;
                 fabObj._isRemote = true;   // не отправляем обратно по сети
                 if (eraserPartial) {
@@ -3949,6 +4037,12 @@ function renderSingleCursor(cursorEl, worldX, worldY) {
     const CSRF_TOKEN = '{{ csrf_token }}';
 
     function saveObjectToDB(fabObject, broadcast = true) {
+        // Множественное выделение — не объект доски: сохраняем каждый его объект отдельно (в абсолютных координатах).
+        // Раньше в БД попадал сам activeSelection, и потом на доске «склеивались» много фигур сразу.
+        if (fabObject.type === 'activeSelection') {
+            fabObject.getObjects().slice().forEach(o => { if (o !== exportFrame && !o._isPreview) saveObjectToDB(o, broadcast); });
+            return;
+        }
         // Генерируем уникальный ID объекту, если его еще нет
         if (!fabObject.id) {
             fabObject.id = 'obj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
@@ -4086,7 +4180,7 @@ function renderSingleCursor(cursorEl, worldX, worldY) {
                     return resolve();
                 }
                 fabric.util.enlivenObjects([state], function (objs) {
-                    const o = objs[0];
+                    const o = rebuildShapeGroup(objs[0]);
                     if (!o) return resolve();
                     o.id = id;
                     o._isRemote = true;   // object:added не должен сохранять повторно
@@ -4272,6 +4366,33 @@ function renderSingleCursor(cursorEl, worldX, worldY) {
                 const jsonObjects = data.objects.map(item => item.data);
                 jsonObjects.forEach(o => History.noteRemote(o));   // «исходное» состояние для отмены
                 canvas.loadFromJSON({ objects: jsonObjects }, () => {
+                    // Чиним «склеенные» фигуры: ранее в БД мог попасть контейнер множественного выделения
+                    canvas.getObjects().slice().forEach(o => {
+                        if (o.type !== 'activeSelection') return;
+                        const kids = o.getObjects().slice();
+                        const idx = canvas.getObjects().indexOf(o);
+                        o._silentRemove = true; canvas.remove(o);
+                        if (o.id) removeObjectFromDB(o);
+                        o._restoreObjectsState();
+                        kids.forEach((k, i) => {
+                            delete k.group; k.setCoords();
+                            if (!k.id) k.id = 'obj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                            k._isRemote = true;
+                            const exists = canvas.getObjects().find(x => x.id === k.id);
+                            if (exists) { exists._silentRemove = true; canvas.remove(exists); }
+                            canvas.insertAt(k, Math.max(0, idx) + i);
+                            saveObjectToDB(k);
+                        });
+                    });
+                    // Пересобираем группы-фигуры, чтобы рамка выделения совпадала с содержимым
+                    canvas.getObjects().slice().forEach(o => {
+                        if (o.type !== 'group') return;
+                        const ng = rebuildShapeGroup(o);
+                        if (ng === o) return;
+                        const idx = canvas.getObjects().indexOf(o);
+                        o._silentRemove = true; canvas.remove(o);
+                        ng._isRemote = true; canvas.insertAt(ng, idx);
+                    });
                     canvas.renderAll();
                     History.refresh();
                     console.log("Доска успешно загружена из БД.");

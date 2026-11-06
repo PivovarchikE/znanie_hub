@@ -253,5 +253,13 @@
 {% bootstrap_javascript %}
 <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script src="{% static 'js/search.js' %}"></script>
+<script>
+window.addEventListener('pageshow', function(event) {
+    // Если страница загружена из кэша браузера (при нажатии "Назад")
+    if (event.persisted) {
+        window.location.reload();
+    }
+});
+</script>
 </body>
 </html>
