@@ -8,6 +8,8 @@
     .img-thumbnail:hover { transform: scale(1.02); }
     .border-dashed { border: 2px dashed #dee2e6; border-radius: 10px; }
     .chat-bubble { max-width: 85%; font-size: 0.9rem; border-radius: 15px !important; padding: 10px 15px; }
+
+    .min-w-0 { min-width: 0; }
 </style>
 
 {# is_teacher и launch_url приходят из вьюхи homework_view_detail #}
@@ -28,44 +30,46 @@
 
     <div class="card shadow border-0 p-4">
         {# --- ШАПКА --- #}
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-                <div class="text-uppercase text-muted small fw-bold mb-1">
-                    {{ homework.subject.name }}{% if homework.section %} &bull; {{ homework.section.title }}{% endif %}
-                </div>
-                <h2 class="fw-bold mb-2">{{ homework.title }}</h2>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    {% if homework.hw_type == 'simulator' %}
-                        <span class="badge bg-info text-dark px-3"><i class="bi bi-cpu me-1"></i>{{ homework.get_hw_type_display }}</span>
-                    {% elif homework.hw_type == 'interactive_theory' %}
-                        <span class="badge bg-success px-3"><i class="bi bi-mortarboard me-1"></i>{{ homework.get_hw_type_display }}</span>
-                    {% elif homework.hw_type == 'theory' %}
-                        <span class="badge bg-secondary px-3"><i class="bi bi-book me-1"></i>{{ homework.get_hw_type_display }}</span>
-                    {% else %}
-                        <span class="badge bg-primary px-3"><i class="bi bi-pencil-square me-1"></i>{{ homework.get_hw_type_display }}</span>
-                    {% endif %}
-                    {% if homework.topic %}
-                        <span class="text-muted small">Тема: <strong>{{ homework.topic.title }}</strong></span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="d-flex gap-2 flex-shrink-0">
-                <a href="javascript:history.back()" class="btn btn-light btn-sm">
-                    <i class="bi bi-arrow-left"></i> Назад
-                </a>
-                {% if is_teacher %}
-                    {% if not homework.is_completed %}
-                        <a href="{% url 'edit_homework' homework.id %}" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-pencil"></i> Редактировать
-                        </a>
-                    {% else %}
-                        <button class="btn btn-outline-secondary btn-sm" disabled title="Нельзя редактировать выполненное задание">
-                            <i class="bi bi-pencil"></i> Редактировать
-                        </button>
-                    {% endif %}
-                {% endif %}
-            </div>
+        <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-start gap-3 mb-3">
+    <div class="min-w-0 flex-md-grow-1">
+        <div class="text-uppercase text-muted small fw-bold mb-1">
+            {{ homework.subject.name }}{% if homework.section %} &bull; {{ homework.section.title }}{% endif %}
         </div>
+        <h2 class="fw-bold mb-2 text-break">{{ homework.title }}</h2>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if homework.hw_type == 'simulator' %}
+                <span class="badge bg-info text-dark px-3"><i class="bi bi-cpu me-1"></i>{{ homework.get_hw_type_display }}</span>
+            {% elif homework.hw_type == 'interactive_theory' %}
+                <span class="badge bg-success px-3"><i class="bi bi-mortarboard me-1"></i>{{ homework.get_hw_type_display }}</span>
+            {% elif homework.hw_type == 'theory' %}
+                <span class="badge bg-secondary px-3"><i class="bi bi-book me-1"></i>{{ homework.get_hw_type_display }}</span>
+            {% else %}
+                <span class="badge bg-primary px-3"><i class="bi bi-pencil-square me-1"></i>{{ homework.get_hw_type_display }}</span>
+            {% endif %}
+            {% if homework.topic %}
+                <span class="text-muted small">Тема: <strong>{{ homework.topic.title }}</strong></span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Кнопки: на мобильных — колонка на всю ширину, на md+ — обычный ряд справа #}
+    <div class="d-grid d-md-flex gap-2 flex-md-shrink-0">
+        <a href="javascript:history.back()" class="btn btn-light btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Назад
+        </a>
+        {% if is_teacher and not homework.group %}
+            {% if not homework.is_completed %}
+                <a href="{% url 'edit_homework' homework.id %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Редактировать
+                </a>
+            {% else %}
+                <button class="btn btn-outline-secondary btn-sm" disabled title="Нельзя редактировать выполненное задание">
+                    <i class="bi bi-pencil me-1"></i>Редактировать
+                </button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
 
         <hr>
 

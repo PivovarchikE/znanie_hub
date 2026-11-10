@@ -20,21 +20,23 @@
 <div class="container mt-5">
     <h1 class="mb-4 fw-bold">{{ subject.name }}</h1>
 
-    <ul class="nav nav-tabs border-bottom" id="mathTabs" role="tablist">
-        {% for section in sections %}
-            {% if not section.parent %}
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if forloop.first %}active fw-bold text-secondary{% else %}custom-tab-link{% endif %} border-bottom-0"
-                        id="section-tab-{{ section.pk }}"
-                        data-bs-toggle="tab"
-                        data-bs-target="#section-content-{{ section.pk }}"
-                        type="button" role="tab">
-                    {{ section.title }}
-                </button>
-            </li>
-            {% endif %}
-        {% endfor %}
-    </ul>
+        <div class="section-tabs-wrap" id="mathTabsWrap">
+            <ul class="nav nav-tabs border-bottom flex-nowrap" id="mathTabs" role="tablist">
+                {% for section in sections %}
+                    {% if not section.parent %}
+                    <li class="nav-item flex-shrink-0" role="presentation">
+                        <button class="nav-link {% if forloop.first %}active fw-bold text-secondary{% else %}custom-tab-link{% endif %} border-bottom-0"
+                                id="section-tab-{{ section.pk }}"
+                                data-bs-toggle="tab"
+                                data-bs-target="#section-content-{{ section.pk }}"
+                                type="button" role="tab">
+                            {{ section.title }}
+                        </button>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
 
     <div class="tab-content border-top pt-4" id="mathTabsContent">
         {% for section in sections %}
@@ -110,6 +112,92 @@ document.addEventListener("DOMContentLoaded", function() {
             console.error("Элемент accordion-item-" + sectionId + " не найден!");
         }
     }
+
+    // --- Поведение полосы вкладок ---
+    const tabsEl = document.getElementById('mathTabs');
+    const tabsWrap = document.getElementById('mathTabsWrap');
+
+    function updateTabsFade() {
+        if (!tabsEl || !tabsWrap) return;
+        const maxScroll = tabsEl.scrollWidth - tabsEl.clientWidth;
+        tabsWrap.classList.toggle('can-scroll-left', tabsEl.scrollLeft > 4);
+        tabsWrap.classList.toggle('can-scroll-right', tabsEl.scrollLeft < maxScroll - 4);
+        tabsEl.classList.toggle('is-scrollable', maxScroll > 4);
+    }
+
+    function centerActiveTab() {
+        const active = tabsEl.querySelector('.nav-link.active');
+        if (!active) return;
+        const target = active.offsetLeft - (tabsEl.clientWidth - active.offsetWidth) / 2;
+        tabsEl.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+    }
+
+    if (tabsEl) {
+        tabsEl.addEventListener('scroll', updateTabsFade, { passive: true });
+        window.addEventListener('resize', updateTabsFade);
+        tabsEl.addEventListener('shown.bs.tab', centerActiveTab);
+        updateTabsFade();
+
+        // --- Прокрутка колёсиком мыши (вертикальное колесо -> горизонтальный скролл) ---
+        tabsEl.addEventListener('wheel', (e) => {
+            if (tabsEl.scrollWidth <= tabsEl.clientWidth + 1) return;   // нечего скроллить
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;        // тачпад уже крутит горизонтально
+
+            const atStart = tabsEl.scrollLeft <= 0;
+            const atEnd   = tabsEl.scrollLeft >= tabsEl.scrollWidth - tabsEl.clientWidth;
+            // на краях отдаём событие странице, чтобы не «залипать»
+            if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return;
+
+            e.preventDefault();
+            tabsEl.scrollLeft += e.deltaY;
+            updateTabsFade();
+        }, { passive: false });
+
+        // --- Перетаскивание мышью (drag-to-scroll) ---
+        let isDown = false;
+        let didDrag = false;
+        let dragStartX = 0;
+        let dragStartScroll = 0;
+
+        tabsEl.addEventListener('dragstart', (e) => e.preventDefault());
+
+        tabsEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'mouse' || e.button !== 0) return;
+            isDown = true;
+            didDrag = false;
+            dragStartX = e.clientX;
+            dragStartScroll = tabsEl.scrollLeft;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isDown) return;
+            const dx = e.clientX - dragStartX;
+            if (!didDrag && Math.abs(dx) > 4) {
+                didDrag = true;
+                tabsEl.classList.add('dragging');
+            }
+            if (didDrag) {
+                tabsEl.scrollLeft = dragStartScroll - dx;
+                updateTabsFade();
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (!isDown) return;
+            isDown = false;
+            tabsEl.classList.remove('dragging');
+        });
+
+        // Подавляем клик по вкладке, если это было перетаскивание, а не клик
+        tabsEl.addEventListener('click', (e) => {
+            if (didDrag) {
+                e.preventDefault();
+                e.stopPropagation();
+                didDrag = false;
+            }
+        }, true);
+
+    }
 });
 </script>
 
@@ -120,5 +208,75 @@ document.addEventListener("DOMContentLoaded", function() {
     .topic-item { list-style: none; padding: 12px 0; border-bottom: 1px solid #f8f9fa; }
     .topic-item:last-child { border-bottom: none; }
     .topic-link:hover .topic-title { color: #0d6efd; text-decoration: underline; }
+
+    /* Вкладки разделов: одна строка + горизонтальный скролл */
+    .section-tabs-wrap { position: relative; }
+
+    #mathTabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;          /* Firefox */
+        -ms-overflow-style: none;       /* старый Edge */
+    }
+    #mathTabs::-webkit-scrollbar { display: none; }  /* Chrome, Safari */
+
+    #mathTabs .nav-item { flex: 0 0 auto; scroll-snap-align: start; }
+
+    #mathTabs .nav-link {
+        white-space: nowrap;
+        min-height: 44px;               /* удобная зона нажатия на телефоне */
+        padding: 0.65rem 1rem;
+    }
+
+    /* Градиенты по краям как подсказка, что есть ещё вкладки */
+    .section-tabs-wrap::before,
+    .section-tabs-wrap::after {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 1px;
+        width: 28px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 2;
+    }
+    .section-tabs-wrap::before { left: 0;  background: linear-gradient(to right, #fff, rgba(255,255,255,0)); }
+    .section-tabs-wrap::after  { right: 0; background: linear-gradient(to left,  #fff, rgba(255,255,255,0)); }
+    .section-tabs-wrap.can-scroll-left::before  { opacity: 1; }
+    .section-tabs-wrap.can-scroll-right::after  { opacity: 1; }
+
+    @media (min-width: 992px) {
+        #mathTabs .nav-link { padding: 0.75rem 1.25rem; }
+    }
+
+    /* Курсор-подсказка, что полосу можно тащить */
+    #mathTabs.is-scrollable { cursor: grab; }
+    #mathTabs.is-scrollable .nav-link { cursor: inherit; }
+
+    /* Состояние перетаскивания */
+    #mathTabs.dragging {
+        cursor: grabbing;
+        scroll-snap-type: none;   /* отключаем snap, иначе дёргается при drag */
+        user-select: none;
+    }
+    #mathTabs.dragging .nav-link { pointer-events: none; }
+
+    /* Убираем синий «тап-хайлайт» на iOS/Android и контекстное меню по долгому тапу */
+    #mathTabs .nav-link {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    /* Рамку фокуса показываем только при навигации клавиатурой (Tab),
+       но не при клике мышью и не при тач-касании */
+    #mathTabs .nav-link:focus:not(:focus-visible) {
+        outline: none;
+        box-shadow: none;
+    }
 </style>
 {% endblock %}
