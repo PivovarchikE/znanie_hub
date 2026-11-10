@@ -316,7 +316,13 @@ def group_detail_view(request, pk):
         teacher=teacher_profile
     )
 
-    grouped_homeworks = get_grouped_homeworks_for_group(group)
+    page_obj = Paginator(get_grouped_homeworks_for_group(group), 5).get_page(request.GET.get('page'))
+
+    # Сохраняем остальные GET-параметры (например, from=schedule) в ссылках пагинации
+    query = request.GET.copy()
+    query.pop('page', None)
+    qs = query.urlencode()
+    page_qs = f'{qs}&' if qs else ''
 
     # Проверяем, откуда пришел пользователь
     from_param = request.GET.get('from')
@@ -329,7 +335,8 @@ def group_detail_view(request, pk):
 
     context = {
         'group': group,
-        'grouped_homeworks': grouped_homeworks,
+        'page_obj': page_obj,
+        'page_qs': page_qs,
         'back_url': back_url,
         'back_label': back_label,
     }
@@ -356,25 +363,35 @@ def complete_group_view(request, pk):
 
 def get_grouped_homeworks_for_group(group):
     """
-    Получает все домашние задания группы и группирует их по единым выданным таскам.
+    Возвращает список кортежей (meta, [homeworks]) — по одному на каждое назначение группе.
+    Новые назначения идут первыми.
     """
     homeworks = (
         models.Homework.objects
-        .filter(group=group)
+        .filter(group=group, deleted_at__isnull=True)
         .select_related('subject', 'student__user')
         .order_by('-created_at')
     )
 
-    grouped_homeworks = defaultdict(list)
-
+    batches = {}  # dict сохраняет порядок вставки
     for hw in homeworks:
-        group_key = (
-            hw.title,
-            hw.subject.name if hw.subject else '—',
-            hw.hw_type,
-            hw.get_hw_type_display(),
-            hw.deadline,
-        )
-        grouped_homeworks[group_key].append(hw)
+        if hw.batch_id:
+            key = ('batch', hw.batch_id)
+        else:  # старые записи без batch_id
+            key = ('legacy', hw.title, hw.subject_id, hw.hw_type, hw.deadline)
 
-    return dict(grouped_homeworks)
+        if key not in batches:
+            meta = (
+                hw.title,
+                hw.subject.name if hw.subject else '—',
+                hw.hw_type,
+                hw.get_hw_type_display(),
+                hw.deadline,
+            )
+            batches[key] = (meta, [])
+        batches[key][1].append(hw)
+
+    result = list(batches.values())
+    for _meta, hw_list in result:
+        hw_list.sort(key=lambda h: (h.student.user.last_name, h.student.user.first_name))
+    return result
