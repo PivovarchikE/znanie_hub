@@ -180,56 +180,93 @@
                     <div class="mb-4">
                         <label class="form-label fw-bold">Дедлайн</label>
                         {{ form.deadline }}
-                        {% if form.deadline.errors %}<div class="text-danger small">{{ form.deadline.errors.0 }}</div>{% endif %}
+                        <div class="form-text text-muted small mt-1">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Укажите дату и время сдачи. <strong>Оставьте поле пустым</strong>, если дедлайн не требуется.
+                        </div>
+                        {% if form.deadline.errors %}
+                            <div class="text-danger small">{{ form.deadline.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
-                    <!-- Блок выбора учеников -->
-                    <div class="mb-4 card bg-light p-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label fw-bold m-0">👥 Кому назначить задание</label>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-primary" id="select-all-students">Выбрать всех</button>
-                                <button type="button" class="btn btn-outline-secondary" id="deselect-all-students">Снять выбор</button>
-                            </div>
-                        </div>
-                        <div class="text-muted small mb-3">По умолчанию выбраны все ученики группы</div>
+<!-- Блок выбора учеников -->
+<div class="mb-4 card bg-light p-3">
 
-                        <div class="row g-2" style="max-height: 250px; overflow-y: auto;" id="students-container">
-                            {% for student in group.students.all %}
-                                <div class="col-md-6">
-                                    <div class="form-check p-2 border rounded bg-white shadow-sm d-flex align-items-center justify-content-between">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <input class="form-check-input student-checkbox ms-1 mt-0"
-                                                   type="checkbox"
-                                                   name="selected_students"
-                                                   value="{{ student.id }}"
-                                                   id="student_{{ student.id }}"
-                                                   {% if not selected_student_ids or student.id in selected_student_ids %}checked{% endif %}>
+    <!-- Малые экраны: заголовок-переключатель (пустая кнопка без Bootstrap-классов .btn) -->
+    <button type="button"
+            class="gd-toggle w-100 border-0 bg-transparent d-flex d-lg-none justify-content-between align-items-center gap-2 px-0 py-2 text-start fw-bold mb-0"
+            data-gd-target="gd-students-block"
+            aria-expanded="false"
+            aria-controls="gd-students-block">
+        <span class="gd-toggle-label gd-min-0">
+            <span class="d-block text-break">👥 Кому назначить задание</span>
+            <span class="d-block fw-normal text-muted small mt-1">
+                Выбрано: <span id="students-count-mobile">0</span> из {{ group.students.count }}
+            </span>
+        </span>
+        <span class="d-flex align-items-center gap-1 small fw-normal text-muted flex-shrink-0">
+            <span class="gd-when-closed">Показать</span>
+            <span class="gd-when-open">Скрыть</span>
+            <i class="bi bi-chevron-down gd-chevron"></i>
+        </span>
+    </button>
 
-                                            {% if student.user.avatar_url %}
-                                                <img src="{{ student.user.avatar_url }}"
-                                                     class="rounded-circle object-fit-cover"
-                                                     style="width: 28px; height: 28px;">
-                                            {% else %}
-                                                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold"
-                                                     style="width: 28px; height: 28px; font-size: 0.75rem;">
-                                                    {{ student.user.last_name|default:student.user.username|slice:":1"|upper }}
-                                                </div>
-                                            {% endif %}
+    <!-- Большие экраны: обычный заголовок -->
+    <div class="d-none d-lg-block fw-bold mb-2">👥 Кому назначить задание</div>
 
-                                            <label class="form-check-label fw-semibold text-dark text-truncate" for="student_{{ student.id }}">
-                                                {{ student.user.get_full_name|default:student.user.username }}
-                                            </label>
-                                        </div>
-                                    </div>
+    <div id="gd-students-block" class="gd-collapsible">
+
+        <!-- Строка с подсказкой и кнопками (с переносом на узких экранах) -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div class="btn-group btn-group-sm flex-shrink-0">
+                <button type="button" class="btn btn-outline-primary" id="select-all-students">
+                    Выбрать всех
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="deselect-all-students">
+                    Снять выбор
+                </button>
+            </div>
+        </div>
+
+        <div class="row g-2" style="max-height: 250px; overflow-y: auto;" id="students-container">
+            {% for student in group.students.all %}
+                <div class="col-md-6">
+                    <div class="form-check p-2 border rounded bg-white shadow-sm d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2 gd-min-0">
+                            <input class="form-check-input student-checkbox ms-1 mt-0 flex-shrink-0"
+                                   type="checkbox"
+                                   name="selected_students"
+                                   value="{{ student.id }}"
+                                   id="student_{{ student.id }}"
+                                   {% if not selected_student_ids or student.id in selected_student_ids %}checked{% endif %}>
+
+                            {% if student.user.avatar_url %}
+                                <img src="{{ student.user.avatar_url }}"
+                                     class="rounded-circle object-fit-cover flex-shrink-0"
+                                     style="width: 28px; height: 28px;">
+                            {% else %}
+                                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                                     style="width: 28px; height: 28px; font-size: 0.75rem;">
+                                    {{ student.user.last_name|default:student.user.username|slice:":1"|upper }}
                                 </div>
-                            {% endfor %}
-                        </div>
-                        <div id="students-error" class="text-danger small mt-2 d-none">
-                            ⚠️ Выберите хотя бы одного ученика для назначения ДЗ.
+                            {% endif %}
+
+                            <label class="form-check-label fw-semibold text-dark text-truncate gd-min-0"
+                                   for="student_{{ student.id }}">
+                                {{ student.user.get_full_name|default:student.user.username }}
+                            </label>
                         </div>
                     </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
 
+    <!-- Сообщение об ошибке — ВНЕ сворачиваемого блока, чтобы было видно всегда -->
+    <div id="students-error" class="text-danger small mt-2 d-none">
+        ⚠️ Выберите хотя бы одного ученика для назначения ДЗ.
+    </div>
+</div>
                     <div class="d-flex justify-content-between mt-4">
                         <a href="{% url 'group_detail' group.id %}" class="btn btn-outline-secondary">Отмена</a>
                         <button type="submit" class="btn btn-primary px-4">
@@ -245,6 +282,9 @@
 <style>
     .border-danger { border: 1px solid #dc3545 !important; }
     .text-danger { font-size: 0.85rem; }
+
+    /* Для корректной работы text-truncate внутри flex-контейнеров */
+    .gd-min-0 { min-width: 0; }
 
     .selectable-topic {
         cursor: pointer;
@@ -262,6 +302,33 @@
         border: 1px solid #198754 !important;
         box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.15);
     }
+
+    /* --- Сворачиваемые блоки (как в group_detail.html) --- */
+    @media (max-width: 991.98px) {
+        .gd-collapsible:not(.is-open) { display: none; }
+    }
+    .gd-toggle .gd-chevron { transition: transform .2s ease; }
+    .gd-toggle[aria-expanded="true"] .gd-chevron { transform: rotate(180deg); }
+    .gd-toggle[aria-expanded="true"] .gd-when-closed { display: none; }
+    .gd-toggle[aria-expanded="false"] .gd-when-open { display: none; }
+
+    /* Аккуратный вид пустого datetime-local */
+    input[type="datetime-local"]:invalid,
+    input[type="datetime-local"]:not(:focus):placeholder-shown {
+        color: #6c757d;
+    }
+
+    /* Кнопка-переключатель: разрешаем перенос текста и гарантируем, что
+   длинный заголовок не наедет на «Показать / Скрыть» */
+        .gd-toggle.btn {
+            white-space: normal !important;
+        }
+        .gd-toggle .gd-toggle-label {
+            flex: 1 1 auto;
+            min-width: 0;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+        }
 </style>
 
 <script src="{% static 'js/picker_ui.js' %}"></script>
@@ -299,7 +366,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const initialSectionId = "{{ form.section.value|default:'' }}";
     const initialTopicId = hiddenTopicInput?.value || "{{ form.topic.value|default:'' }}";
 
-        const settingsInput = document.getElementById('id_simulator_settings');
+    const settingsInput = document.getElementById('id_simulator_settings');
     const settingsBox = document.getElementById('sim_settings_box');
     const homeworkFormEl = document.getElementById('homework-form');
     let configPickers = {};
@@ -493,42 +560,42 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-// --- Обработчики событий смены полей ---
+    // --- Обработчики событий смены полей ---
 
-// При смене предмета — перезагружаем список разделов и сбрасываем всё, что ниже
-subjectSelect?.addEventListener('change', async function() {
-    clearFieldError(this);
+    // При смене предмета — перезагружаем список разделов и сбрасываем всё, что ниже
+    subjectSelect?.addEventListener('change', async function() {
+        clearFieldError(this);
 
-    // Сбрасываем раздел
-    if (sectionSelect) sectionSelect.innerHTML = '<option value="">---------</option>';
+        // Сбрасываем раздел
+        if (sectionSelect) sectionSelect.innerHTML = '<option value="">---------</option>';
 
-    // Сбрасываем темы
-    if (topicWrapper) topicWrapper.classList.add('d-none');
-    if (topicContainer) topicContainer.innerHTML = '';
-    if (hiddenTopicInput) hiddenTopicInput.value = '';
+        // Сбрасываем темы
+        if (topicWrapper) topicWrapper.classList.add('d-none');
+        if (topicContainer) topicContainer.innerHTML = '';
+        if (hiddenTopicInput) hiddenTopicInput.value = '';
 
-    // Сбрасываем тренажёр и его настройки
-    const configSelect = document.getElementById('id_simulator_config');
-    if (configSelect) configSelect.innerHTML = '<option value="">---------</option>';
-    configPickers = {};
-    if (settingsInput) settingsInput.value = '';
-    if (settingsBox) {
-        settingsBox.classList.add('d-none');
-        settingsBox.innerHTML = '';
-    }
+        // Сбрасываем тренажёр и его настройки
+        const configSelect = document.getElementById('id_simulator_config');
+        if (configSelect) configSelect.innerHTML = '<option value="">---------</option>';
+        configPickers = {};
+        if (settingsInput) settingsInput.value = '';
+        if (settingsBox) {
+            settingsBox.classList.add('d-none');
+            settingsBox.innerHTML = '';
+        }
 
-    await loadSections(this.value);
-});
+        await loadSections(this.value);
+    });
 
-// При смене раздела — перезагружаем аккордеон тем
-sectionSelect?.addEventListener('change', async function() {
-    clearFieldError(this);
+    // При смене раздела — перезагружаем аккордеон тем
+    sectionSelect?.addEventListener('change', async function() {
+        clearFieldError(this);
 
-    // Сбрасываем тему (раздел изменился)
-    if (hiddenTopicInput) hiddenTopicInput.value = '';
+        // Сбрасываем тему (раздел изменился)
+        if (hiddenTopicInput) hiddenTopicInput.value = '';
 
-    await loadAccordion(this.value);
-});
+        await loadAccordion(this.value);
+    });
 
     const TYPE_RULES = {
         theory:             { files: true,  sim: false },
@@ -558,44 +625,44 @@ sectionSelect?.addEventListener('change', async function() {
     typeSelect?.addEventListener('change', applyType);
 
     function hasPicker(c) {
-    const p = c && c.picker;
-    if (!p || typeof p !== 'object') return false;
-    if (Array.isArray(p)) return p.length > 0;
-    return Object.keys(p).length > 0;
-}
+        const p = c && c.picker;
+        if (!p || typeof p !== 'object') return false;
+        if (Array.isArray(p)) return p.length > 0;
+        return Object.keys(p).length > 0;
+    }
 
-function loadConfigs(topicId) {
-    const configSelect = document.getElementById('id_simulator_config');
-    if (!configSelect) return;
-    const previousVal = String(configSelect.value || '');
+    function loadConfigs(topicId) {
+        const configSelect = document.getElementById('id_simulator_config');
+        if (!configSelect) return;
+        const previousVal = String(configSelect.value || '');
 
-    fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(res => res.json())
-    .then(data => {
-        configSelect.innerHTML = '<option value="">---------</option>';
-        configPickers = {};
+        fetch(`{% url 'ajax_get_configs' %}?topic_id=${topicId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(res => res.json())
+        .then(data => {
+            configSelect.innerHTML = '<option value="">---------</option>';
+            configPickers = {};
 
-        const configs = Array.isArray(data) ? data : (data.configs || data.results || data.data || []);
+            const configs = Array.isArray(data) ? data : (data.configs || data.results || data.data || []);
 
-        configs.forEach(c => {
-            configSelect.add(new Option(c.label, c.id));
-            configPickers[String(c.id)] = c.picker;
+            configs.forEach(c => {
+                configSelect.add(new Option(c.label, c.id));
+                configPickers[String(c.id)] = c.picker;
+            });
+
+            const previousIsValid = previousVal && configs.some(c => String(c.id) === previousVal);
+            if (previousIsValid) {
+                configSelect.value = previousVal;
+            } else {
+                const pickerConfig = configs.find(hasPicker);
+                configSelect.value = pickerConfig ? String(pickerConfig.id) : '';
+            }
+
+            renderSettings();
+        })
+        .catch(err => {
+            console.error('Ошибка при загрузке конфигураций:', err);
         });
-
-        const previousIsValid = previousVal && configs.some(c => String(c.id) === previousVal);
-        if (previousIsValid) {
-            configSelect.value = previousVal;
-        } else {
-            const pickerConfig = configs.find(hasPicker);
-            configSelect.value = pickerConfig ? String(pickerConfig.id) : '';
-        }
-
-        renderSettings();
-    })
-    .catch(err => {
-        console.error('Ошибка при загрузке конфигураций:', err);
-    });
-}
+    }
 
     // --- Управление файлами (FormSet) ---
     addFileBtn?.addEventListener('click', function() {
@@ -644,14 +711,32 @@ function loadConfigs(topicId) {
         checkGlobalFormValidity();
     });
 
+    // Раскрытие/скрытие сворачиваемых блоков (без Bootstrap JS)
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-gd-target]');
+        if (!btn) return;
+        const target = document.getElementById(btn.getAttribute('data-gd-target'));
+        if (!target) return;
+        const isOpen = target.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
     // --- Управление выбором учеников ---
+    function updateSelectedCount() {
+        const checked = document.querySelectorAll('.student-checkbox:checked').length;
+        const el = document.getElementById('students-count-mobile');
+        if (el) el.textContent = checked;
+    }
+
     selectAllBtn?.addEventListener('click', function() {
         studentCheckboxes.forEach(cb => cb.checked = true);
         studentsError?.classList.add('d-none');
+        updateSelectedCount();
     });
 
     deselectAllBtn?.addEventListener('click', function() {
         studentCheckboxes.forEach(cb => cb.checked = false);
+        updateSelectedCount();
     });
 
     studentCheckboxes.forEach(cb => {
@@ -659,6 +744,7 @@ function loadConfigs(topicId) {
             if (document.querySelectorAll('.student-checkbox:checked').length > 0) {
                 studentsError?.classList.add('d-none');
             }
+            updateSelectedCount();
         });
     });
 
@@ -666,10 +752,22 @@ function loadConfigs(topicId) {
         const checkedStudents = document.querySelectorAll('.student-checkbox:checked');
         if (checkedStudents.length === 0) {
             e.preventDefault();
+
+            // На мобильном блок учеников может быть свёрнут — раскроем его, чтобы ошибка была видна
+            const studentsBlock = document.getElementById('gd-students-block');
+            const toggleBtn = document.querySelector('[data-gd-target="gd-students-block"]');
+            if (studentsBlock && !studentsBlock.classList.contains('is-open')) {
+                studentsBlock.classList.add('is-open');
+                toggleBtn?.setAttribute('aria-expanded', 'true');
+            }
+
             studentsError?.classList.remove('d-none');
             studentsError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     });
+
+    // Первичная инициализация счётчика выбранных учеников
+    updateSelectedCount();
 
     // --- ПОСЛЕДОВАТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ---
     if (subjectSelect?.value) {
