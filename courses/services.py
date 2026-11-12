@@ -37,8 +37,9 @@ def generate_math_tasks_addition_and_substraction(config_params):
         if isinstance(op, str) and op in ALLOWED_OPERATIONS
     ] or ['+', '-']
 
+    count = _bounded(config_params.get('count'), 1, 100, 20)
     problems = []
-    for _ in range(5):   # TODO: в docstring и seed_db подразумевается 50 (params["count"])
+    for _ in range(count):
         a = random.randint(min_val, max_val)
         b = random.randint(min_val, max_val)
         op = random.choice(operations)

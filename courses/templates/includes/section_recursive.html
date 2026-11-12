@@ -40,9 +40,9 @@
                     </div>
                     <div class="flex-grow-1 item-title">{{ item.title }}</div>
                     {# Проверяем наличие теории или тренажера #}
-                    {% if item.text_content %}
-                        <span class="badge-pill-bright bg-blue-soft text-blue me-2">Теория</span>
-                    {% endif %}
+                        {% if item.text_content %}
+                            <span class="badge-theory me-2">Теория</span>
+                        {% endif %}
                     <i class="bi bi-chevron-right item-arrow"></i>
                 </a>
             </div>

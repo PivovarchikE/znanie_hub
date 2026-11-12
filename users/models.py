@@ -79,13 +79,15 @@ class User(AbstractUser, BaseModel):
     def get_role_display(self):
         return self.role
 
-    '''
-    Нужно доработать.
-    Флаг проверки пользователя администратором, который получает уведомление
-    при самостоятельной регистрации пользователя.
-    Если пользователя ученика регистрирует учитель, то флаг автоматически True
-    '''
-    is_validate = models.BooleanField(default=False)
+
+    # Подтверждён ли пользователь администратором.
+    # Самостоятельная регистрация -> False (и is_active=False);
+    # если ученика регистрирует учитель -> True.
+    is_validate = models.BooleanField(
+        default=False,
+        verbose_name="Подтверждён администратором",
+        help_text="Регистрация подтверждена администратором.",
+    )
 
     middle_name = models.CharField(max_length=255, blank=True, null=True)
 

@@ -91,6 +91,13 @@ class SimulatorConfig(BaseModel):
     label = models.CharField(max_length=100)  # "в пределах до 100"
     params = models.JSONField()  # Храним настройки: {"min": 0, "max": 100, "count": 50}
 
+    tasks_count = models.PositiveSmallIntegerField(
+        "Количество заданий",
+        default=20,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text="Сколько примеров выдавать в тренажёре (для самостоятельных работ не используется).",
+    )
+
     def __str__(self):
         return f"{self.get_config_type_display()} ({self.label})"
 

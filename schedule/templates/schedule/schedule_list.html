@@ -416,15 +416,6 @@
         <form @submit.prevent="submitForm()">
   <div class="modal-body">
 
-    <template x-if="overlapWarning">
-      <div class="alert alert-warning border-warning rounded-3 mb-3 small d-flex flex-column gap-2" role="alert">
-        <span x-text="overlapWarning"></span>
-        <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" @click="confirmSave('this_only', true)">
-          Всё равно сохранить
-        </button>
-      </div>
-    </template>
-
     <template x-if="students.length === 0 || subjects.length === 0">
       <div class="alert alert-warning rounded-3 mb-3 small" role="alert">
         <div class="fw-bold mb-1">Нельзя создать урок!</div>
@@ -602,6 +593,15 @@
 
     </div>
   </div>
+          <!-- Предупреждение о наложении: прямо над кнопками -->
+          <div class="px-3" x-show="overlapWarning" x-cloak x-ref="overlapAlert">
+            <div class="alert alert-warning border-warning rounded-3 mb-2 small d-flex flex-column gap-2" role="alert">
+              <span x-text="overlapWarning"></span>
+              <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" @click="confirmSave(lastUpdateMode, true)">
+                Всё равно сохранить
+              </button>
+            </div>
+          </div>
 
   <!-- Стандартный футер модалки (кнопки снизу справа) -->
   <div class="modal-footer border-0 pt-0">
@@ -673,6 +673,7 @@ function scheduleApp() {
     isDeleteModalOpen: false,
     showEditModeModal: false,
     overlapWarning: null,
+    lastUpdateMode: 'this_only',
 
     // Фильтрация в панели управления
     filterType: 'all',
@@ -977,10 +978,12 @@ function scheduleApp() {
       this.isModalOpen = false;
       this.showEditModeModal = false;
       this.overlapWarning = null;
+      this.lastUpdateMode = 'this_only';
     },
 
     editLesson(lesson) {
       this.overlapWarning = null;
+      this.lastUpdateMode = 'this_only';
       this.studentSearchQuery = '';
       this.groupSearchQuery = '';
       this.showGroupStudents = false;
@@ -1015,6 +1018,7 @@ function scheduleApp() {
 
     resetForm() {
       this.overlapWarning = null;
+      this.lastUpdateMode = 'this_only';
       this.studentSearchQuery = '';
       this.groupSearchQuery = '';
       this.showGroupStudents = false;
@@ -1083,6 +1087,9 @@ function scheduleApp() {
     },
 
     async confirmSave(updateMode = 'this_only', forceSave = false) {
+      // Запоминаем режим, чтобы «Всё равно сохранить» применил тот же выбор
+      this.lastUpdateMode = updateMode;
+
       const getCookie = (name) => {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -1134,6 +1141,10 @@ function scheduleApp() {
         if (result.warning_overlap && !forceSave) {
           this.overlapWarning = result.message;
           this.showEditModeModal = false;
+          // Показываем предупреждение внизу формы, рядом с кнопками
+          this.$nextTick(() => {
+            this.$refs.overlapAlert?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
           return;
         }
 

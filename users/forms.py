@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import get_user_model
 from django.forms import inlineformset_factory
 from django.forms.models import BaseInlineFormSet
@@ -347,3 +347,15 @@ class StudentGroupForm(forms.ModelForm):
             self.fields['students'].queryset = StudentProfile.objects.filter(
                 teachers=teacher_profile
             ).select_related('user', 'school_class')
+
+
+class ApprovalAuthenticationForm(AuthenticationForm):
+    def confirm_login_allowed(self, user):
+        if not user.is_active:
+            if not user.is_validate:
+                raise forms.ValidationError(
+                    "Ваш аккаунт ожидает подтверждения администратором. "
+                    "Вход станет доступен после проверки.",
+                    code='pending_approval',
+                )
+            raise forms.ValidationError("Аккаунт отключён. Обратитесь к администратору.", code='inactive')

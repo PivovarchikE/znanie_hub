@@ -180,13 +180,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             elements.setupScreen.classList.add('d-none');
             elements.workoutScreen.classList.remove('d-none');
-            window.scrollTo(0, 0);
             currentIdx = 0;
             results = [];
             startTime = new Date();
             if (elements.totalSteps) elements.totalSteps.innerText = activeProblems.length;
             startTimer();
             loadQuestion();
+            // Показываем экран тренировки с самого верха (шапка + задание + поле ввода),
+            // а не прокручиваем страницу к баннеру
+            elements.workoutScreen.scrollIntoView({ block: 'start' });
         } finally {
             starting = false;
         }
@@ -200,7 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const q = activeProblems[currentIdx];
         elements.expression.innerText = q.question;
         elements.input.value = '';
-        elements.input.focus();
+        // preventScroll: фокус не должен сам прокручивать страницу
+        elements.input.focus({ preventScroll: true });
         elements.currentStep.innerText = currentIdx + 1;
         elements.progressBar.style.width = `${(currentIdx / activeProblems.length) * 100}%`;
     }

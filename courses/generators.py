@@ -45,7 +45,7 @@ def generate_multiplication_table_tasks(params):
         pairs = [(n, b) for b in range(1, 11)] + [(b, n) for b in range(1, 11)]
         # Убираем дубликаты (например, если n * n) и перемешиваем
         pairs = list(set(pairs))
-        count = _int(params.get('count'), 1, 20, 20)
+        count = _int(params.get('count'), 1, 19, 19)
 
     random.shuffle(pairs)
     # Берем нужное количество (или все доступные, если их меньше count)
@@ -196,7 +196,7 @@ PICKER_SCHEMAS = {
     'multiplication_table': {
         'mode': 'single', 'key': 'factor', 'title': 'На что умножаем?', 'default': 'all',
         'options': [{'value': str(n), 'label': str(n)} for n in range(1, 11)]
-                   + [{'value': 'all', 'label': 'Вся таблица умножения (40 заданий)'}],
+                   + [{'value': 'all', 'label': 'Вся таблица умножения'}],
     },
     'multiplication_division': {
         'mode': 'multi', 'key': 'operations', 'title': 'Выберите типы операций',
@@ -231,12 +231,15 @@ def get_picker(params):
     return PICKER_SCHEMAS.get(params.get('kind'))
 
 
-def generate_tasks(params, selection=None):
+def generate_tasks(params, selection=None, count=None):
     """
     Единая точка входа. selection — выбор ученика с фронта; применяется только к
     разрешенным ключам и только если конфиг не заблокирован учителем ("locked": true).
+    count — количество заданий из SimulatorConfig.tasks_count (перекрывает count в params).
     """
     params = params or {}
+    if count:
+        params = {**params, 'count': count, 'all_count': count}
     entry = KINDS.get(params.get('kind'))
     if not entry:
         return generate_math_tasks_addition_and_substraction(params)

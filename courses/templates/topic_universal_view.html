@@ -166,24 +166,25 @@
 
     {# --- ЭКРАН ТРЕНИРОВКИ --- #}
     <div id="workoutScreen" class="d-none">
-        <div class="card shadow border-0 p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <button class="btn btn-outline-secondary" onclick="window.location.reload()">← К теории</button>
-                <div id="timer" class="fw-bold text-primary fs-3">00:00</div>
-                <div class="text-muted">Прогресс: <span id="currentStep">1</span>/<span id="totalSteps">5</span></div>
+        <div class="card shadow border-0 p-3 p-md-4 mb-3 mb-md-4">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">← Назад</button>
+                <div id="timer" class="fw-bold text-primary timer-text">00:00</div>
+                <div class="text-muted small text-nowrap"><span id="currentStep">1</span>/<span id="totalSteps">5</span></div>
             </div>
-            <div class="progress mt-3" style="height: 10px;">
+            <div class="progress mt-2 mt-md-3" style="height: 8px;">
                 <div id="progressBar" class="progress-bar bg-success" style="width: 0%"></div>
             </div>
         </div>
 
-        <div class="card shadow border-0 py-5 text-center">
-            <div class="card-body">
-                <h1 class="display-1 fw-bold mb-4" id="expression">...</h1>
-                <div class="d-flex justify-content-center mb-4">
-                    <input type="number" id="userAnswer" class="form-control form-control-lg w-25 text-center shadow-sm" style="font-size: 3rem; height: 100px;" autofocus>
+        <div class="card shadow border-0 py-3 py-md-5 text-center" id="taskCard">
+            <div class="card-body px-2 px-md-4">
+                <div class="fw-bold mb-3 mb-md-4 task-expression" id="expression">...</div>
+                <div class="d-flex justify-content-center mb-3 mb-md-4">
+                    <input type="number" step="any" inputmode="decimal" enterkeyhint="done" autocomplete="off"
+                           id="userAnswer" class="form-control form-control-lg text-center shadow-sm task-input">
                 </div>
-                <button id="nextBtn" class="btn btn-primary btn-lg px-5 py-3 fs-4">Ответить</button>
+                <button id="nextBtn" class="btn btn-primary btn-lg px-5 py-2 py-md-3 w-100 task-btn">Ответить</button>
             </div>
         </div>
     </div>
@@ -210,6 +211,30 @@
 
 <style>
     .pe-none { pointer-events: none; }
+
+    /* Тренажер: адаптивные размеры под телефон / планшет / ПК */
+    #workoutScreen { scroll-margin-top: 8px; }
+    .timer-text { font-size: clamp(1.25rem, 5vw, 1.75rem); }
+    .task-expression {
+        font-size: clamp(2rem, 9vw, 4.5rem);
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+    }
+    .task-input {
+        width: 100%;
+        max-width: 420px;
+        height: auto;
+        padding: .4rem .75rem;
+        font-size: clamp(1.75rem, 7vw, 3rem);
+    }
+    .task-btn { max-width: 420px; font-size: clamp(1.1rem, 4vw, 1.5rem); }
+    @media (max-width: 575.98px) {
+        .container-fluid { padding-left: .75rem; padding-right: .75rem; }
+    }
+    @media (max-height: 520px) and (orientation: landscape) {
+        .task-expression { font-size: 2rem; margin-bottom: .5rem !important; }
+        .task-input { font-size: 1.75rem; }
+    }
     .theory-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; }
 </style>
 {% endblock %}

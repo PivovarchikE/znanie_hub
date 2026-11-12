@@ -39,6 +39,13 @@ def create_recurring_lessons(teacher, student, subject, days_of_week, start_time
         end_date=end_date
     )
 
+    # bulk_create не вызывает save(), поэтому длительность считаем явно
+    t_start = datetime.combine(date.today(), start_time)
+    t_end = datetime.combine(date.today(), end_time)
+    if t_end <= t_start:
+        t_end += timedelta(days=1)
+    duration_minutes = max(0, int((t_end - t_start).total_seconds() // 60))
+
     lessons_to_create = []
     current_date = start_date
 
@@ -53,6 +60,7 @@ def create_recurring_lessons(teacher, student, subject, days_of_week, start_time
                     date=current_date,
                     start_time=start_time,
                     end_time=end_time,
+                    duration_minutes=duration_minutes,
                     price=price,
                     recurring_rule=rule
                 )
@@ -88,7 +96,7 @@ def delete_recurring_lessons(lesson, mode='this_only'):
         rule.delete()
 
 
-def calculate_schedule_analytics(teacher, start_date, end_date, student_id=None):
+def calculate_schedule_analytics(teacher, start_date, end_date, student_id=None, group_id=None):
     """Универсальный расчет аналитики за произвольный период (неделя/месяц)."""
     queryset = Lesson.objects.filter(
         teacher=teacher,
@@ -97,6 +105,8 @@ def calculate_schedule_analytics(teacher, start_date, end_date, student_id=None)
 
     if student_id:
         queryset = queryset.filter(student_id=student_id)
+    elif group_id:
+        queryset = queryset.filter(group_id=group_id)
 
     total_lessons = queryset.count()
     completed_lessons = queryset.filter(status=Lesson.Status.COMPLETED).count()
