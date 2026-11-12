@@ -106,7 +106,7 @@ def topic_detail(request, topic_id):
         if conf.config_type == 'exam':
             problems = conf.params.get('fixed_tasks', [])
         else:
-            problems = generate_tasks(conf.params, hw_settings if fixed_by_hw else None)
+            problems = generate_tasks(conf.params, hw_settings if fixed_by_hw else None, count=conf.tasks_count)
 
         all_problems_data[str(conf.id)] = {
             'label': conf.label,
@@ -152,7 +152,7 @@ def generate_tasks_api(request):
         selection['operations'] = [o for o in request.GET['operations'].split(',') if o]
     if 'level' in request.GET:
         selection['level'] = request.GET['level']
-    return JsonResponse({'problems': generate_tasks(conf.params, selection)})
+    return JsonResponse({'problems': generate_tasks(conf.params, selection, count=conf.tasks_count)})
 
 
 @login_required

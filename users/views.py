@@ -11,7 +11,7 @@ from django.db import transaction
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, logout, get_user_model
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
@@ -20,7 +20,8 @@ from django.forms import inlineformset_factory
 
 from courses import models
 from users.forms import TeacherProfileForm, StudentProfileForm, UserRegistrationForm, PhoneFormSet, UserPhoneNumberForm, \
-    BasePhoneFormSet, UserProfileEditForm, AvatarUpdateForm, StudentGroupForm
+    BasePhoneFormSet, UserProfileEditForm, AvatarUpdateForm, StudentGroupForm, ApprovalAuthenticationForm
+from users.services import notify_admins_about_registration
 from users.models import StudentProfile, TeacherProfile, Role, UserPhoneNumber, StudentGroup
 
 
@@ -53,7 +54,15 @@ def dynamic_register_view(request, role_slug):
                     # 1. Сохраняем User
                     user = u_form.save(commit=False)
                     user.set_password(u_form.cleaned_data.get('password'))
+                    # Ученика регистрирует учитель -> сразу активен; иначе ждёт админа
+                    registered_by_teacher = (
+                        role_slug == 'student'
+                        and request.user.is_authenticated
+                        and request.user.role.slug == 'teacher'
+                    )
                     user.role = role
+                    user.is_active = registered_by_teacher
+                    user.is_validate = registered_by_teacher
                     user.save()
                     u_form.save_m2m()
 
@@ -82,11 +91,15 @@ def dynamic_register_view(request, role_slug):
                         obj.delete()
 
                 # Редиректы после успешной транзакции
-                if request.user.is_authenticated and request.user.role.slug == 'teacher':
+                if registered_by_teacher:
                     messages.success(request, f'Ученик {user.get_full_name()} успешно зарегистрирован и добавлен в ваш список.')
                     return redirect('teacher_dashboard')
 
-                messages.success(request, 'Вы успешно зарегистрированы! Войдите в систему')
+                notify_admins_about_registration(user, request)
+                messages.success(
+                    request,
+                    'Заявка отправлена! Вы сможете войти после подтверждения администратором.'
+                )
                 return redirect('login')
 
             except Exception as e:
@@ -111,13 +124,12 @@ def dynamic_register_view(request, role_slug):
 @require_http_methods(['POST', 'GET'])
 def login_view(request):
     if request.method == 'POST':
-        form = AuthenticationForm(data=request.POST)
+        form = ApprovalAuthenticationForm(request, data=request.POST)
         if form.is_valid():
-            user = form.get_user()
-            login(request, user)
+            login(request, form.get_user())
             return redirect('index')
     else:
-        form = AuthenticationForm()
+        form = ApprovalAuthenticationForm(request)
     return render(request, 'registration/login.html', {'form': form})
 
 
