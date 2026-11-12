@@ -2,12 +2,33 @@ from django.contrib import admin
 from .models import Subject, Section, Topic, SimulatorConfig, TrainingSession, Homework, HomeworkFile
 
 
+# --- HELP TEXT ---
+HELP_TEXTS = {
+    'tasks_count': "Сколько примеров получит ученик за одну тренировку (1–100). "
+                   "Только для типа «Тренажёр»; для самостоятельной работы не используется. "
+                   "Для таблицы умножения на одно число максимум 19 уникальных примеров, "
+                   "для «всей таблицы» максимум 81.",
+    'params': 'JSON с настройками генератора, например {"kind": "multiplication_division"} '
+              'или {"min": 1, "max": 20, "operations": ["+", "-"]}. '
+              'Для самостоятельной работы: {"fixed_tasks": [{"question": "2 + 2", "answer": "4"}]}. '
+              '"locked": true отключает выбор параметров учеником.',
+    'config_type': "«Тренажёр» генерирует случайные примеры, «Самостоятельная работа» использует фиксированный список.",
+}
+
+
+class HelpTextMixin:
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in HELP_TEXTS:
+            kwargs['help_text'] = HELP_TEXTS[db_field.name]
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+
 # --- INLINES ---
 
-class SimulatorConfigInline(admin.TabularInline):
+class SimulatorConfigInline(HelpTextMixin, admin.TabularInline):
     model = SimulatorConfig
     extra = 1
-    fields = ('label', 'config_type', 'params')
+    fields = ('label', 'config_type', 'tasks_count', 'params')
 
 
 class HomeworkFileInline(admin.TabularInline):
@@ -42,9 +63,11 @@ class TopicAdmin(admin.ModelAdmin):
 
 
 @admin.register(SimulatorConfig)
-class SimulatorConfigAdmin(admin.ModelAdmin):
-    list_display = ('label', 'topic', 'config_type')
+class SimulatorConfigAdmin(HelpTextMixin, admin.ModelAdmin):
+    list_display = ('label', 'topic', 'config_type', 'tasks_count')
+    list_editable = ('tasks_count',)
     list_filter = ('config_type',)
+    search_fields = ('label', 'topic__title')
 
 
 @admin.register(Homework)

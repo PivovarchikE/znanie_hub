@@ -160,7 +160,10 @@ def get_week_schedule_api(request):
             'is_overlapping': has_overlap
         })
 
-    analytics = calculate_schedule_analytics(teacher, analytics_start, analytics_end, student_id)
+    analytics = calculate_schedule_analytics(
+        teacher, analytics_start, analytics_end,
+        student_id=student_id, group_id=group_id
+    )
 
     return JsonResponse({
         'period_start': start_date.strftime('%Y-%m-%d'),
