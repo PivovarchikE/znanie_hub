@@ -1,0 +1,123 @@
+{# Мобильные табы — показываются только внутри offcanvas #}
+<div class="mobile-tabs d-lg-none mb-3">
+    <button type="button"
+            class="mobile-tab {% if groups %}active{% endif %}"
+            data-tab="groups">
+        <i class="bi bi-people-fill"></i> Группы
+        <span class="badge">{{ groups|length }}</span>
+    </button>
+    <button type="button"
+            class="mobile-tab {% if not groups %}active{% endif %}"
+            data-tab="teachers">
+        <i class="bi bi-person-badge"></i> Учителя
+        <span class="badge">{{ teachers|length }}</span>
+    </button>
+</div>
+
+{# --- Группы --- #}
+<div class="side-panel {% if groups %}active{% endif %}" data-panel="groups">
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Мои группы</h5>
+                <span class="badge bg-primary rounded-pill">{{ groups|length }}</span>
+            </div>
+
+            <div class="panel-track">
+                {% for group in groups %}
+                <div class="panel-item">
+                    <div class="group-card p-3 border rounded-3 bg-light transition-hover h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-circle group-avatar flex-shrink-0 text-white me-3 shadow-sm">
+                                <i class="bi bi-people-fill"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <h6 class="mb-0 fw-bold text-truncate">{{ group.name }}</h6>
+                                <small class="text-muted d-block text-truncate">
+                                    {{ group.teacher.user.get_full_name }} · {{ group.students.count }} уч.
+                                </small>
+                            </div>
+                        </div>
+                        <a href="{% url 'boards:open_entity_board' 'group' group.id %}"
+                           target="_blank" rel="noopener"
+                           class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-easel me-1"></i> Перейти к доске
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="panel-empty text-center text-muted py-4">
+                    <i class="bi bi-people display-5 d-block mb-2 opacity-50"></i>
+                    Групп пока нет
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# --- Учителя --- #}
+<div class="side-panel {% if not groups %}active{% endif %}" data-panel="teachers">
+    <div class="card border-0 shadow-sm teachers-sidebar">
+        <div class="card-body">
+            <h5 class="fw-bold mb-4">Мои учителя</h5>
+
+            <div class="panel-track">
+                {% for teacher in teachers %}
+                <div class="panel-item">
+                    <div class="teacher-card p-3 border rounded-3 bg-light transition-hover h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-circle bg-primary text-white me-3 shadow-sm">
+                                {{ teacher.user.first_name|slice:":1" }}
+                            </div>
+                            <div class="overflow-hidden">
+                                <h6 class="mb-0 fw-bold text-truncate">{{ teacher.user.get_full_name }}</h6>
+                                <small class="text-muted d-block text-truncate">
+                                    {% for sub in teacher.subjects.all %}
+                                        {{ sub.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </small>
+                            </div>
+                        </div>
+
+                        <a href="{% url 'boards:open_entity_board' 'teacher' teacher.id %}"
+                           target="_blank" rel="noopener"
+                           class="btn btn-sm btn-outline-primary w-100 mb-2">
+                            <i class="bi bi-easel me-1"></i> Переход к доске
+                        </a>
+
+                        <div class="mb-2 d-flex align-items-center small">
+                            <i class="bi bi-envelope-at me-2 text-muted"></i>
+                            <span class="text-dark text-truncate">{{ teacher.user.email }}</span>
+                        </div>
+
+                        {% with teacher_phone=teacher.user.phones.first %}
+                            {% if teacher_phone %}
+                                <div class="mb-2 d-flex align-items-center small">
+                                    <i class="bi bi-telephone me-2 text-muted"></i>
+                                    <a href="tel:{{ teacher_phone.number }}"
+                                       class="text-decoration-none text-dark fw-medium">
+                                        {{ teacher_phone.number }}
+                                    </a>
+                                </div>
+                                <a href="https://wa.me/{{ teacher_phone.number|cut:'+'|cut:' '|cut:'-' }}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-success w-100 mt-2 shadow-sm">
+                                    <i class="bi bi-whatsapp me-2"></i>Написать сообщение
+                                </a>
+                            {% else %}
+                                <div class="text-muted fst-italic small mt-2">Контакт не указан</div>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="panel-empty text-center text-muted py-4">
+                    <i class="bi bi-person-x display-5 d-block mb-2 opacity-50"></i>
+                    Учителя еще не назначены
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

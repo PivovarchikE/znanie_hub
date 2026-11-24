@@ -37,7 +37,6 @@
                                         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                                             <span class="badge bg-light text-dark border px-2">{{ hw.subject.name }}</span>
 
-                                            {# Динамические статусы #}
                                             {% if hw.is_completed %}
                                                 <span class="badge bg-success-subtle text-success border border-success small">
                                                     <i class="bi bi-check-circle-fill me-1"></i> Выполнено
@@ -86,12 +85,10 @@
                             {% if hw.is_completed %}
                                 <div class="mb-2">
                                     {% if hw.hw_type == 'theory' or hw.hw_type == 'interactive_theory' %}
-                                        {# Для теории вместо баллов показываем иконку успеха #}
                                         <span class="badge bg-success px-3 py-2 rounded-pill">
                                             <i class="bi bi-check-all me-1"></i> Материал изучен
                                         </span>
                                     {% else %}
-                                        {# Для тренажеров и практики показываем баллы #}
                                         <span class="h3 fw-bold text-success">
                                             {% if hw.hw_type == 'simulator' %}
                                                 {{ hw.score|default:"0" }}%
@@ -125,118 +122,510 @@
             {% endif %}
         </div>
 
-        {# Правая колонка: Группы и учителя #}
-<div class="col-lg-4 mt-4 mt-lg-0">
+{# Правая колонка: только для десктопа #}
+<div class="col-lg-4 mt-4 mt-lg-0 d-none d-lg-block">
+    {% include "includes/_sidebar_widgets.html" %}
+</div>
 
-    {% if groups %}
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0">Мои группы</h5>
-                <span class="badge bg-primary rounded-pill">{{ groups|length }}</span>
-            </div>
+{# FAB — только мобильные и планшеты #}
+<button type="button"
+        class="sidebar-fab d-lg-none"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#mobileSidebar"
+        aria-controls="mobileSidebar"
+        aria-label="Открыть группы и учителей">
+    <i class="bi bi-people-fill"></i>
+</button>
 
-            {% for group in groups %}
-            <div class="group-card p-3 mb-3 border rounded-3 bg-light transition-hover">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="avatar-circle group-avatar flex-shrink-0 text-white me-3 shadow-sm">
-                        <i class="bi bi-people-fill"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <h6 class="mb-0 fw-bold text-truncate">{{ group.name }}</h6>
-                        <small class="text-muted d-block text-truncate">
-                            {{ group.teacher.user.get_full_name }} · {{ group.students.count }} уч.
-                        </small>
-                    </div>
-                </div>
-                <a href="{% url 'boards:open_entity_board' 'group' group.id %}"
-                   target="_blank" rel="noopener"
-                   class="btn btn-sm btn-outline-primary w-100">
-                    <i class="bi bi-easel me-1"></i> Перейти к доске группы
-                </a>
-            </div>
-            {% endfor %}
-        </div>
+{# Bottom-sheet с контентом #}
+<div class="offcanvas offcanvas-bottom mobile-sidebar-offcanvas d-lg-none"
+     tabindex="-1"
+     id="mobileSidebar"
+     aria-labelledby="mobileSidebarLabel">
+
+    <div class="drag-handle" aria-hidden="true"></div>
+
+    <div class="offcanvas-header pb-2">
+        <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">
+            Группы и учителя
+        </h5>
+        <button type="button" class="btn-close"
+                data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
     </div>
-    {% endif %}
-
-    <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
-            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-4">Мои учителя</h5>
-                    {% for teacher in teachers %}
-                        <div class="teacher-card p-3 mb-3 border rounded-3 bg-light transition-hover">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="avatar-circle bg-primary text-white me-3 shadow-sm">
-                                    {{ teacher.user.first_name|slice:":1" }}
-                                </div>
-
-                                <div class="overflow-hidden">
-                                    <h6 class="mb-0 fw-bold text-truncate">{{ teacher.user.get_full_name }}</h6>
-                                    <small class="text-muted d-block text-truncate">
-                                        {% for sub in teacher.subjects.all %}
-                                            {{ sub.name }}{% if not forloop.last %}, {% endif %}
-                                        {% endfor %}
-                                    </small>
-
-                                </div>
-
-                            </div>
-                            <div class="small">
-                                        <a href="{% url 'boards:open_entity_board' 'teacher' teacher.id %}"
-                                           target="_blank" rel="noopener"
-                                           class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-easel me-1"></i> Переход к доске
-                                </a>
-                                </div>
-                            <div class="small">
-                                <div class="mb-2 d-flex align-items-center">
-                                    <i class="bi bi-envelope-at me-2 text-muted"></i>
-                                    <span class="text-dark text-truncate">{{ teacher.user.email }}</span>
-                                </div>
-
-                                {% with teacher_phone=teacher.user.phones.first %}
-                                    {% if teacher_phone %}
-                                        <div class="mb-2 d-flex align-items-center">
-                                            <i class="bi bi-telephone me-2 text-muted"></i>
-                                            <a href="tel:{{ teacher_phone.number }}" class="text-decoration-none text-dark fw-medium">
-                                                {{ teacher_phone.number }}
-                                            </a>
-                                        </div>
-                                        <a href="https://wa.me/{{ teacher_phone.number|cut:'+'|cut:' '|cut:'-' }}"
-                                           target="_blank" class="btn btn-sm btn-success w-100 mt-2 shadow-sm">
-                                            <i class="bi bi-whatsapp me-2"></i>Написать сообщение
-                                        </a>
-                                    {% else %}
-                                        <div class="text-muted fst-italic small mt-2">Контакт не указан</div>
-                                    {% endif %}
-                                {% endwith %}
-                            </div>
-                        </div>
-                    {% empty %}
-                        <p class="text-muted text-center py-4">Учителя еще не назначены</p>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
+    <div class="offcanvas-body pt-2">
+        {% include "includes/_sidebar_widgets.html" %}
     </div>
 </div>
 
 <style>
-    .transition-hover { transition: all 0.3s ease; }
-    .transition-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
-    .avatar-circle {
-        width: 45px;
-        height: 45px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+/* ====== Общие ====== */
+.transition-hover { transition: all 0.3s ease; }
+.transition-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+.avatar-circle {
+    width: 45px; height: 45px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+}
+.completed-card { border-left: 5px solid #198754 !important; }
+.border-dashed  { border-style: dashed !important; border-width: 2px !important; }
+.group-avatar   { background: linear-gradient(45deg, #6366f1, #8b5cf6); }
+
+/* ====== Sticky-сайдбар только на десктопе ====== */
+@media (min-width: 992px) {
+    .teachers-sidebar {
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(13, 110, 253, .35) transparent;
     }
-    .completed-card { border-left: 5px solid #198754 !important; }
-    .border-dashed { border-style: dashed !important; border-width: 2px !important; }
-    .group-avatar { background: linear-gradient(45deg, #6366f1, #8b5cf6); }
+    .teachers-sidebar::-webkit-scrollbar { width: 6px; }
+    .teachers-sidebar::-webkit-scrollbar-thumb {
+        background: rgba(13, 110, 253, .35); border-radius: 3px;
+    }
+}
+
+/* ====== FAB ====== */
+.sidebar-fab {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 56px; height: 56px; border-radius: 50%; border: 0;
+    background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    color: #fff; font-size: 1.25rem;
+    box-shadow: 0 8px 24px rgba(13, 110, 253, .4);
+    z-index: 1030;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.sidebar-fab:active { transform: scale(.94); }
+.sidebar-fab:hover  { box-shadow: 0 10px 28px rgba(13, 110, 253, .55); }
+
+/* ====== Bottom-sheet ======
+   Селектор с #mobileSidebar имеет специфичность 1,1,0 — гарантированно
+   переопределяет .offcanvas-bottom { height: 30vh } из Bootstrap. */
+#mobileSidebar.mobile-sidebar-offcanvas {
+    height: 80vh;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    /* height в transition — чтобы «snap» к 100% или сброс шли плавно */
+    transition: transform .3s ease-in-out, height .25s ease-out;
+}
+
+/* Во время drag — без transition по height, чтобы следовать 1:1 за пальцем */
+#mobileSidebar.mobile-sidebar-offcanvas.is-dragging {
+    transition: transform .3s ease-in-out;
+}
+
+#mobileSidebar.mobile-sidebar-offcanvas .offcanvas-header {
+    padding-top: .25rem;
+}
+
+/* ====== Мобильные табы ====== */
+.mobile-tabs {
+    display: flex; gap: .5rem;
+    background: #fff; padding: .35rem;
+    border-radius: 999px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+.mobile-tab {
+    flex: 1; border: 0; background: transparent;
+    padding: .6rem 1rem; border-radius: 999px;
+    font-weight: 600; color: #6c757d;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: .35rem; transition: all .2s ease; font-size: .9rem;
+}
+.mobile-tab .badge {
+    background: rgba(13,110,253,.12); color: #0d6efd;
+    font-size: .7rem; padding: .25em .5em;
+}
+.mobile-tab.active {
+    background: #0d6efd; color: #fff;
+    box-shadow: 0 4px 12px rgba(13,110,253,.3);
+}
+.mobile-tab.active .badge {
+    background: rgba(255,255,255,.25); color: #fff;
+}
+
+/* ====== Мобильный карусель внутри panels ====== */
+@media (max-width: 991.98px) {
+    .side-panel:not(.active) { display: none; }
+
+    .panel-track {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -1rem;
+        padding: 0 1rem .5rem;
+        scrollbar-width: none;
+    }
+    .panel-track::-webkit-scrollbar { display: none; }
+
+    .panel-item {
+        flex: 0 0 88%;
+        scroll-snap-align: center;
+        min-width: 0;
+    }
+    .panel-item .group-card,
+    .panel-item .teacher-card {
+        margin-bottom: 0 !important;
+    }
+
+    .panel-empty {
+        flex: 0 0 100%;
+        scroll-snap-align: center;
+    }
+
+    .panel-dots {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .panel-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: rgba(0,0,0,.15);
+        transition: all .2s ease;
+    }
+    .panel-dot.active {
+        width: 18px; border-radius: 3px; background: #0d6efd;
+    }
+}
+.panel-dots { display: none; }
+
+/* ===== Карусель: обёртка и стрелки ===== */
+.panel-carousel { position: relative; }
+
+.carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 0;
+    background: #fff;
+    color: #0d6efd;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .15);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    z-index: 5;
+    cursor: pointer;
+    transition: opacity .2s, transform .2s, background .2s, color .2s;
+}
+.panel-carousel.has-overflow .carousel-arrow { display: flex; }
+.carousel-arrow:hover { background: #0d6efd; color: #fff; }
+.carousel-arrow:active { transform: translateY(-50%) scale(.92); }
+.carousel-arrow.is-hidden { opacity: 0; pointer-events: none; }
+
+.carousel-arrow-prev { left: -6px; }
+.carousel-arrow-next { right: -6px; }
+
+@media (hover: none) and (pointer: coarse) {
+    .carousel-arrow { display: none !important; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .panel-track { cursor: grab; }
+    .panel-track.is-dragging {
+        cursor: grabbing;
+        user-select: none;
+        scroll-snap-type: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .panel-track::after {
+        content: "";
+        flex: 0 0 1px;
+    }
+}
+
+.mobile-sidebar-offcanvas .offcanvas-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ====== Drag-handle ====== */
+.drag-handle {
+    flex-shrink: 0;
+    width: 96px;
+    height: 24px;
+    margin: 6px auto 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    z-index: 2;
+}
+.drag-handle::after {
+    content: "";
+    width: 40px;
+    height: 4px;
+    background: rgba(0, 0, 0, .18);
+    border-radius: 2px;
+    transition: background .15s ease, width .2s ease;
+}
+.drag-handle:hover::after,
+.mobile-sidebar-offcanvas.is-dragging .drag-handle::after {
+    background: rgba(0, 0, 0, .35);
+    width: 48px;
+}
+.mobile-sidebar-offcanvas.is-dragging .drag-handle { cursor: grabbing; }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    /* ==== Табы «Группы / Учителя» ==== */
+    document.querySelectorAll('.mobile-tabs').forEach(tabsWrap => {
+        const container = tabsWrap.parentElement;
+        const tabs   = tabsWrap.querySelectorAll('.mobile-tab');
+        const panels = container.querySelectorAll('.side-panel');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                tabs.forEach(t => t.classList.toggle('active', t === tab));
+                panels.forEach(p =>
+                    p.classList.toggle('active', p.dataset.panel === target)
+                );
+                container.querySelectorAll('.panel-track').forEach(initTrack);
+            });
+        });
+    });
+
+    /* ==== Инициализация карусели ==== */
+    function initTrack(track) {
+        if (track.dataset.carouselReady) return;
+        track.dataset.carouselReady = '1';
+
+        const items = track.querySelectorAll('.panel-item');
+        if (items.length < 2) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'panel-carousel';
+        track.parentNode.insertBefore(wrapper, track);
+        wrapper.appendChild(track);
+
+        const prev = document.createElement('button');
+        prev.type = 'button';
+        prev.className = 'carousel-arrow carousel-arrow-prev';
+        prev.setAttribute('aria-label', 'Предыдущая карточка');
+        prev.innerHTML = '<i class="bi bi-chevron-left"></i>';
+
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'carousel-arrow carousel-arrow-next';
+        next.setAttribute('aria-label', 'Следующая карточка');
+        next.innerHTML = '<i class="bi bi-chevron-right"></i>';
+
+        wrapper.appendChild(prev);
+        wrapper.appendChild(next);
+
+        const dotsWrap = document.createElement('div');
+        dotsWrap.className = 'panel-dots';
+        items.forEach((_, i) => {
+            const d = document.createElement('span');
+            d.className = 'panel-dot' + (i === 0 ? ' active' : '');
+            dotsWrap.appendChild(d);
+        });
+        wrapper.after(dotsWrap);
+
+        const step = () => {
+            const gap = parseFloat(getComputedStyle(track).columnGap) || 12;
+            return items[0].getBoundingClientRect().width + gap;
+        };
+
+        const updateArrows = () => {
+            const hasOverflow = track.scrollWidth - track.clientWidth > 5;
+            wrapper.classList.toggle('has-overflow', hasOverflow);
+            prev.classList.toggle('is-hidden', !hasOverflow || track.scrollLeft <= 5);
+            next.classList.toggle('is-hidden', !hasOverflow ||
+                track.scrollLeft >= track.scrollWidth - track.clientWidth - 5);
+        };
+
+        const updateDots = () => {
+            const tr = track.getBoundingClientRect();
+            const center = tr.width / 2;
+            let closest = 0, minDist = Infinity;
+            items.forEach((item, i) => {
+                const r = item.getBoundingClientRect();
+                const c = r.left + r.width / 2 - tr.left;
+                const d = Math.abs(c - center);
+                if (d < minDist) { minDist = d; closest = i; }
+            });
+            dotsWrap.querySelectorAll('.panel-dot').forEach((d, i) =>
+                d.classList.toggle('active', i === closest)
+            );
+        };
+
+        prev.addEventListener('click', () =>
+            track.scrollBy({ left: -step(), behavior: 'smooth' })
+        );
+        next.addEventListener('click', () =>
+            track.scrollBy({ left:  step(), behavior: 'smooth' })
+        );
+
+        track.addEventListener('scroll', () => {
+            updateDots();
+            updateArrows();
+        }, { passive: true });
+        window.addEventListener('resize', () => {
+            updateDots();
+            updateArrows();
+        });
+
+        /* --- Drag мышью --- */
+        let isDown = false, startX = 0, startScroll = 0, moved = false;
+
+        track.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'touch') return;
+            if (e.button !== 0) return;
+            isDown = true;
+            moved = false;
+            startX = e.clientX;
+            startScroll = track.scrollLeft;
+            track.classList.add('is-dragging');
+            try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+
+        track.addEventListener('pointermove', (e) => {
+            if (!isDown) return;
+            const dx = e.clientX - startX;
+            if (Math.abs(dx) > 4) moved = true;
+            track.scrollLeft = startScroll - dx;
+        });
+
+        const endDrag = (e) => {
+            if (!isDown) return;
+            isDown = false;
+            track.classList.remove('is-dragging');
+            try {
+                if (track.hasPointerCapture(e.pointerId)) {
+                    track.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+        };
+        track.addEventListener('pointerup', endDrag);
+        track.addEventListener('pointercancel', endDrag);
+
+        track.addEventListener('click', (e) => {
+            if (moved) {
+                e.preventDefault();
+                e.stopPropagation();
+                moved = false;
+            }
+        }, true);
+
+        requestAnimationFrame(() => { updateDots(); updateArrows(); });
+    }
+
+    /* ==== Drag-handle для bottom-sheet ==== */
+    (function initOffcanvasDrag() {
+        const offcanvas = document.getElementById('mobileSidebar');
+        if (!offcanvas) return;
+        const handle = offcanvas.querySelector('.drag-handle');
+        if (!handle) return;
+
+        let isDragging = false;
+        let dragMoved = false;
+        let startY = 0;
+        let startHeight = 0;
+        let currentHeight = 0;
+        let pointerId = null;
+
+        const vh = () => window.innerHeight;
+        const getHeight = () => offcanvas.getBoundingClientRect().height;
+
+        handle.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            isDragging = true;
+            dragMoved = false;
+            pointerId = e.pointerId;
+            startY = e.clientY;
+            startHeight = getHeight();
+            currentHeight = startHeight;
+            offcanvas.classList.add('is-dragging');
+            try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+            e.preventDefault();
+        });
+
+        handle.addEventListener('pointermove', (e) => {
+            if (!isDragging || e.pointerId !== pointerId) return;
+            dragMoved = true;
+            const dy = e.clientY - startY;
+            const h = vh();
+            // Тянем вверх (dy<0) → height растёт; вниз (dy>0) → падает.
+            let newHeight = startHeight - dy;
+            newHeight = Math.max(h * 0.3, Math.min(h, newHeight));
+            offcanvas.style.height = newHeight + 'px';
+            currentHeight = newHeight;
+        });
+
+        const finishDrag = (e) => {
+            if (!isDragging) return;
+            if (e && e.pointerId !== pointerId) return;
+            isDragging = false;
+            try {
+                if (e && handle.hasPointerCapture(e.pointerId)) {
+                    handle.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+            pointerId = null;
+
+            const h = vh();
+            const ratio = currentHeight / h;
+            const snapHeight = currentHeight;
+            const wasMoved = dragMoved;
+
+            dragMoved = false;
+            currentHeight = 0;
+
+            // Снимаем is-dragging ДО установки финальной высоты:
+            // transition: height снова активен → «snap» к 100% анимируется.
+            offcanvas.classList.remove('is-dragging');
+
+            if (ratio < 0.45) {
+                // Слишком низко — закрываем
+                bootstrap.Offcanvas.getOrCreateInstance(offcanvas).hide();
+            } else if (ratio >= 0.92) {
+                // Дотянули почти до верха → плавно на весь экран
+                offcanvas.style.height = h + 'px';
+            } else if (wasMoved) {
+                // ✅ Сохраняем выбранную высоту (пиксели, не сбрасываем на 80vh)
+                offcanvas.style.height = snapHeight + 'px';
+            }
+            // Если это был просто тап (wasMoved=false) — ничего не меняем,
+            // высота остаётся 80vh из CSS.
+        };
+
+        handle.addEventListener('pointerup', finishDrag);
+        handle.addEventListener('pointercancel', finishDrag);
+
+        // Сброс inline-высоты после закрытия — чтобы следующее открытие
+        // всегда было с дефолтной высотой 80vh
+        offcanvas.addEventListener('hidden.bs.offcanvas', () => {
+            offcanvas.style.height = '';
+        });
+    })();
+
+    document.querySelectorAll('.panel-track').forEach(initTrack);
+
+    /* Пересчитать при открытии offcanvas (вдруг ширина ещё не применена) */
+    const offcanvas = document.getElementById('mobileSidebar');
+    if (offcanvas) {
+        offcanvas.addEventListener('shown.bs.offcanvas', () => {
+            offcanvas.querySelectorAll('.panel-track').forEach(initTrack);
+        });
+    }
+});
+</script>
 {% endblock %}
